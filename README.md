@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Project Management Application (Module 2)
 
 A full-stack MERN (MongoDB, Express, React, Node.js) application for project management with role-based access control, project templates, and milestone tracking.
@@ -65,3 +66,6 @@ Use these credentials to access different roles:
 - **Templates**: Launch projects quickly using predefined templates (e.g., Standard Web Project).
 - **Milestones**: Track progress with percentage-based milestone completion.
 - **RBAC**: Secure role-based access for all actions.
+=======
+# IBM-Internship
+>>>>>>> 2d0cb702aba023ac3dbb9f5f8a91f9e106e18411
