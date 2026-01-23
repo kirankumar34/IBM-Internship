@@ -5,6 +5,7 @@ const Issue = require('../models/issueModel');
 const Milestone = require('../models/milestoneModel');
 const Template = require('../models/templateModel');
 const Activity = require('../models/activityModel');
+const User = require('../models/userModel');
 
 // @desc    Get all projects (filtered by role and archive status)
 // @route   GET /api/projects
@@ -16,16 +17,17 @@ const getProjects = asyncHandler(async (req, res) => {
     let query = { isArchived: archived === 'true' };
 
     // If not admin, filter by ownership or membership
-    if (role !== 'super_admin' && role !== 'project_admin') {
+    if (role !== 'super_admin') {
         query = {
             ...query,
-            $or: [{ owner: id }, { members: id }]
+            $or: [{ owner: id }, { members: id }, { teamLeads: id }]
         };
     }
 
     const projects = await Project.find(query)
         .populate('owner', 'name email role')
         .populate('members', 'name email role')
+        .populate('teamLeads', 'name email role')
         .sort({ createdAt: -1 });
 
     const enrichedProjects = await Promise.all(projects.map(async (p) => {
@@ -61,7 +63,8 @@ const getProjects = asyncHandler(async (req, res) => {
 const getProject = asyncHandler(async (req, res) => {
     const project = await Project.findById(req.params.id)
         .populate('owner', 'name email role')
-        .populate('members', 'name email role');
+        .populate('members', 'name email role')
+        .populate('teamLeads', 'name email role');
 
     if (!project) {
         res.status(404);
@@ -87,7 +90,7 @@ const getProject = asyncHandler(async (req, res) => {
 // @route   POST /api/projects
 // @access  Private (Admin/PM only)
 const createProject = asyncHandler(async (req, res) => {
-    const { name, description, startDate, endDate, members, priority, templateId } = req.body;
+    const { name, description, startDate, endDate, members, teamLeads, priority, templateId } = req.body;
 
     if (!name || !startDate || !endDate) {
         res.status(400);
@@ -106,7 +109,8 @@ const createProject = asyncHandler(async (req, res) => {
         endDate,
         priority: priority || 'Medium',
         owner: req.user.id,
-        members: members || []
+        members: members || [],
+        teamLeads: teamLeads || []
     });
 
     // Handle Template Cloning
@@ -131,7 +135,7 @@ const createProject = asyncHandler(async (req, res) => {
                 await Milestone.insertMany(milestonesToCreate);
             }
 
-            // Clone Tasks (if needed, though tasks often need assignees)
+            // Clone Tasks
             if (template.tasks && template.tasks.length > 0) {
                 const tasksToCreate = template.tasks.map(t => {
                     const dueDate = new Date(start);
@@ -141,9 +145,9 @@ const createProject = asyncHandler(async (req, res) => {
                         description: t.description,
                         project: project._id,
                         priority: t.priority,
-                        status: 'Open',
-
-                        dueDate: t.relativeDueDays ? dueDate : null
+                        status: 'To Do',
+                        dueDate: t.relativeDueDays ? dueDate : null,
+                        createdBy: req.user.id
                     };
                 });
                 await Task.insertMany(tasksToCreate);
@@ -172,21 +176,13 @@ const updateProject = asyncHandler(async (req, res) => {
         throw new Error('Project not found');
     }
 
-    // Authorization: Owner or Admin
-    if (project.owner.toString() !== req.user.id && req.user.role !== 'super_admin' && req.user.role !== 'project_admin') {
+    if (project.owner.toString() !== req.user.id && req.user.role !== 'super_admin') {
         res.status(403);
         throw new Error('Not authorized to update this project');
     }
 
-    // If project is completed, only allow reopening or archiving
-    if (project.status === 'Completed' && req.body.status !== 'Active' && req.body.isArchived === undefined) {
-        // res.status(400);
-        // throw new Error('Completed projects are read-only');
-    }
+    const { status } = req.body;
 
-    const { status, name } = req.body;
-
-    // Log status change
     if (status && status !== project.status) {
         await Activity.create({
             project: project._id,
@@ -199,14 +195,12 @@ const updateProject = asyncHandler(async (req, res) => {
     const updatedProject = await Project.findByIdAndUpdate(req.params.id, req.body, {
         new: true,
         runValidators: true
-    });
+    }).populate('owner members teamLeads');
 
     res.status(200).json(updatedProject);
 });
 
 // @desc    Archive / Restore project (Soft delete)
-// @route   PATCH /api/projects/:id/archive
-// @access  Private (Owner/Admin only)
 const archiveProject = asyncHandler(async (req, res) => {
     const project = await Project.findById(req.params.id);
 
@@ -233,7 +227,47 @@ const archiveProject = asyncHandler(async (req, res) => {
     res.status(200).json(project);
 });
 
-// @desc    Delete project (Permanent - keep for super admin if needed, else soft delete only)
+// @desc    Add member to project
+const addMemberToProject = asyncHandler(async (req, res) => {
+    const { userId, roleAs } = req.body;
+    const project = await Project.findById(req.params.id);
+
+    if (!project) {
+        res.status(404);
+        throw new Error('Project not found');
+    }
+
+    const member = await User.findById(userId);
+    if (!member) {
+        res.status(404);
+        throw new Error('User not found');
+    }
+
+    const callerRole = req.user.role;
+    if (callerRole === 'team_leader' && member.role !== 'team_member') {
+        res.status(403);
+        throw new Error('Team Leaders can only add Team Members.');
+    }
+
+    if (roleAs === 'team_leader') {
+        if (!project.teamLeads.includes(userId)) project.teamLeads.push(userId);
+    } else {
+        if (!project.members.includes(userId)) project.members.push(userId);
+    }
+
+    await project.save();
+
+    await Activity.create({
+        project: project._id,
+        user: req.user.id,
+        action: 'Member Added',
+        details: `${member.name} added as ${roleAs.replace('_', ' ')}.`
+    });
+
+    res.status(200).json(project);
+});
+
+// @desc    Delete project
 const deleteProject = asyncHandler(async (req, res) => {
     const project = await Project.findById(req.params.id);
 
@@ -257,5 +291,6 @@ module.exports = {
     createProject,
     updateProject,
     archiveProject,
+    addMemberToProject,
     deleteProject
 };

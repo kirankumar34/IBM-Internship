@@ -17,14 +17,19 @@ const userSchema = mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['super_admin', 'project_admin', 'project_manager', 'team_member', 'client', 'employee'], // Expanded roles
-        default: 'team_member',
+        enum: ['super_admin', 'project_manager', 'team_leader', 'team_member', 'client'],
+        default: 'client',
     },
-    organization: {
+    organizationId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Organization',
-        // required: true // Optional for Super Admin, but usually required
+    },
+    reportsTo: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
     }
+
 }, {
     timestamps: true,
 });

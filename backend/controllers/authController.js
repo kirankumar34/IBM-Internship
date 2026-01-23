@@ -14,6 +14,7 @@ const generateToken = (id) => {
 // @access  Public
 const registerUser = asyncHandler(async (req, res) => {
     const { name, email, password, role } = req.body;
+    const currentUser = req.user; // If logged in, this will be populated (optional for public register)
 
     if (!name || !email || !password) {
         res.status(400);
@@ -22,28 +23,37 @@ const registerUser = asyncHandler(async (req, res) => {
 
     // Check if user exists
     const userExists = await User.findOne({ email });
-
     if (userExists) {
         res.status(400);
         throw new Error('User already exists');
     }
 
-    // Hash password handled in model pre-save
+    // Register logic allowing all roles
+    let intendedRole = role || 'client';
+    let reportsTo = null;
+
+    if (currentUser) {
+        reportsTo = currentUser._id;
+    }
 
     const user = await User.create({
         name,
         email,
         password,
-        role: role || 'employee', // Default to employee if not specified
+        role: intendedRole,
+        reportsTo,
+        organizationId: currentUser ? currentUser.organizationId : null // Inherit org if admin
     });
 
     if (user) {
+        // Only generate token automatically for public client registration
+        // For administrative creation, we might not want to log them in as the new user
         res.status(201).json({
             _id: user.id,
             name: user.name,
             email: user.email,
             role: user.role,
-            token: generateToken(user._id),
+            token: !currentUser ? generateToken(user._id) : null,
         });
     } else {
         res.status(400);

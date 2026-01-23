@@ -28,6 +28,20 @@ const protect = asyncHandler(async (req, res, next) => {
     }
 });
 
+const optionalProtect = asyncHandler(async (req, res, next) => {
+    let token;
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        try {
+            token = req.headers.authorization.split(' ')[1];
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_do_not_use_in_prod');
+            req.user = await User.findById(decoded.id).select('-password');
+        } catch (error) {
+            // Ignore error for optional protect
+        }
+    }
+    next();
+});
+
 const authorize = (...roles) => {
     return (req, res, next) => {
         if (!req.user || !roles.includes(req.user.role)) {
@@ -38,4 +52,4 @@ const authorize = (...roles) => {
     };
 };
 
-module.exports = { protect, authorize };
+module.exports = { protect, authorize, optionalProtect };

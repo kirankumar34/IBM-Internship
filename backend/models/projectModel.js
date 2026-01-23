@@ -28,6 +28,11 @@ const projectSchema = mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
     }],
+    teamLeads: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+    }],
+
     startDate: {
         type: Date,
         required: true

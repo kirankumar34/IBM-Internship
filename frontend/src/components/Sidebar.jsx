@@ -13,7 +13,7 @@ import AuthContext from '../context/AuthContext';
 
 const Sidebar = () => {
     const location = useLocation();
-    const { logout } = useContext(AuthContext);
+    const { logout, user } = useContext(AuthContext);
 
     const menuItems = [
         { path: '/', icon: LayoutDashboard, label: 'Overview' },
@@ -34,11 +34,11 @@ const Sidebar = () => {
             {/* User Profile / Brand */}
             <div className="flex items-center space-x-3 mb-10">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-green-400 flex items-center justify-center text-dark-900 font-bold">
-                    GH
+                    {user?.name?.charAt(0) || 'U'}
                 </div>
                 <div>
-                    <h3 className="text-white font-semibold text-sm">Guy Hawkins</h3>
-                    <p className="text-dark-500 text-xs">Free Account</p>
+                    <h3 className="text-white font-semibold text-sm truncate w-32">{user?.name || 'User'}</h3>
+                    <p className="text-dark-500 text-xs capitalize">{user?.role?.replace('_', ' ') || 'Guest'}</p>
                 </div>
             </div>
 
@@ -52,8 +52,8 @@ const Sidebar = () => {
                                 key={item.path}
                                 to={item.path}
                                 className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive(item.path)
-                                        ? 'bg-primary text-dark-900 shadow-[0_0_15px_rgba(209,243,102,0.3)]'
-                                        : 'text-dark-500 hover:text-white hover:bg-dark-700'
+                                    ? 'bg-primary text-dark-900 shadow-[0_0_15px_rgba(209,243,102,0.3)]'
+                                    : 'text-dark-500 hover:text-white hover:bg-dark-700'
                                     }`}
                             >
                                 <item.icon size={20} />

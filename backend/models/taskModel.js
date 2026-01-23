@@ -12,6 +12,11 @@ const taskSchema = mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     },
+    createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
     priority: {
         type: String,
         enum: ['Low', 'Medium', 'High', 'Critical'],
@@ -19,12 +24,28 @@ const taskSchema = mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['Open', 'In Progress', 'Review', 'Done'],
-        default: 'Open'
+        enum: ['To Do', 'In Progress', 'Blocked', 'Completed'],
+        default: 'To Do'
     },
-    dueDate: { type: Date }
+    blockedReason: {
+        type: String,
+        default: ''
+    },
+    startDate: { type: Date },
+
+    dueDate: { type: Date },
+    parentTask: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Task',
+        default: null
+    },
+    dependencies: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Task'
+    }]
 }, {
     timestamps: true,
 });
 
 module.exports = mongoose.model('Task', taskSchema);
+
