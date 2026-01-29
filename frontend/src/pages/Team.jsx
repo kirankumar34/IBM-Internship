@@ -77,6 +77,19 @@ const Team = () => {
         }
     };
 
+    const handleApproval = async (id, action) => {
+        try {
+            await api.put(`/users/${id}/approve`, { action });
+            toast.success(`User ${action}d successfully`);
+            fetchUsers();
+        } catch (err) {
+            toast.error(err.response?.data?.message || `Failed to ${action}`);
+        }
+    };
+
+    const pendingUsers = users.filter(u => u.approvalStatus === 'pending');
+    const activeUsers = users.filter(u => u.approvalStatus === 'approved');
+
     // Role Hierarchy Logic for "Add Member" options
     const getAllowedRoles = () => {
         const roles = {
@@ -117,8 +130,53 @@ const Team = () => {
                 )}
             </div>
 
+            {/* Pending Approvals Section */}
+            {pendingUsers.length > 0 && (
+                <div className="mb-10">
+                    <h2 className="text-xl font-bold text-yellow-500 mb-4 flex items-center">
+                        <Shield className="mr-2" /> Pending Approvals
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {pendingUsers.map(user => (
+                            <div key={user._id} className="bg-dark-700/80 border border-yellow-500/30 p-6 rounded-3xl flex flex-col relative overflow-hidden">
+                                <div className="absolute top-0 right-0 bg-yellow-500/20 text-yellow-500 text-[10px] font-bold px-3 py-1 rounded-bl-xl uppercase tracking-wider">
+                                    Needs Approval
+                                </div>
+                                <div className="flex items-center mb-4">
+                                    <div className="w-12 h-12 rounded-xl bg-yellow-500/10 text-yellow-500 flex items-center justify-center font-bold text-lg mr-4">
+                                        {user.name.charAt(0)}
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-white">{user.name}</h3>
+                                        <p className="text-xs text-dark-400">Requesting: {user.requestedRole?.replace('_', ' ') || user.role}</p>
+                                    </div>
+                                </div>
+                                <div className="text-xs text-dark-400 mb-6">
+                                    <p className="flex items-center"><Mail size={12} className="mr-2" /> {user.email}</p>
+                                    <p className="mt-1 flex items-center"><User size={12} className="mr-2" /> Login ID: {user.loginId || user.email}</p>
+                                </div>
+                                <div className="flex space-x-3 mt-auto">
+                                    <button
+                                        onClick={() => handleApproval(user._id, 'approve')}
+                                        className="flex-1 bg-primary text-dark-900 font-bold py-2 rounded-xl hover:bg-primary-hover transition text-sm"
+                                    >
+                                        Approve
+                                    </button>
+                                    <button
+                                        onClick={() => handleApproval(user._id, 'reject')}
+                                        className="flex-1 bg-dark-800 text-dark-400 font-bold py-2 rounded-xl hover:text-white transition text-sm border border-dark-600"
+                                    >
+                                        Reject
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {users.map((user) => (
+                {activeUsers.map((user) => (
                     <div key={user._id} className="bg-dark-700/50 rounded-3xl border border-dark-600 p-6 flex flex-col group hover:border-primary/50 transition-all duration-300 backdrop-blur-sm relative overflow-hidden">
                         {/* Manager Badge */}
                         {user.reportsTo && (

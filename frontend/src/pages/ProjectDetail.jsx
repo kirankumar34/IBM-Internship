@@ -44,6 +44,10 @@ const ProjectDetail = () => {
     const [milestoneForm, setMilestoneForm] = useState({ name: '', description: '', dueDate: '' });
     const [editForm, setEditForm] = useState({ name: '', description: '', status: '', priority: '' });
 
+    // PM Edit State
+    const [showPmEditModal, setShowPmEditModal] = useState(false);
+    const [pmEditForm, setPmEditForm] = useState({ primaryPmId: '', assistantPmId: '' });
+
     const fetchData = async () => {
         try {
             const res = await api.get(`/projects/${id}`);
@@ -54,6 +58,16 @@ const ProjectDetail = () => {
                 description: res.data.description,
                 status: res.data.status,
                 priority: res.data.priority
+            });
+            setEditForm({
+                name: res.data.name,
+                description: res.data.description,
+                status: res.data.status,
+                priority: res.data.priority
+            });
+            setPmEditForm({
+                primaryPmId: res.data.owner?._id || '',
+                assistantPmId: res.data.assistantPm?._id || ''
             });
             setLoading(false);
         } catch (err) {
@@ -143,9 +157,21 @@ const ProjectDetail = () => {
         }
     };
 
+    const handleUpdateManagers = async (e) => {
+        e.preventDefault();
+        try {
+            await api.put(`/projects/${id}/managers`, pmEditForm);
+            toast.success('Project Managers updated successfully');
+            setShowPmEditModal(false);
+            fetchData();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to update managers');
+        }
+    };
+
     if (loading) return <div className="flex items-center justify-center h-64 text-dark-500 animate-pulse">Loading project details...</div>;
 
-    const canManage = user.role === 'super_admin' || user.role === 'project_admin' || (user.role === 'project_manager' && project.owner._id === user.id);
+    const canManage = user.role === 'super_admin' || user.role === 'project_admin' || (user.role === 'project_manager' && project.owner?._id === user.id);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -189,6 +215,25 @@ const ProjectDetail = () => {
                 </div>
             </div>
 
+            {/* Warning Banner for PA/SA if no PM */}
+            {(!project.owner) && (user.role === 'super_admin' || user.role === 'project_admin') && (
+                <div className="bg-warning/10 border border-warning/20 text-warning p-4 rounded-2xl flex items-center animate-in fade-in slide-in-from-top-4">
+                    <div className="mr-3 p-2 bg-warning/20 rounded-full">
+                        <Users size={18} />
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-sm uppercase tracking-wider">Missing Project Manager</h4>
+                        <p className="text-xs opacity-80 mt-1">This project needs a Primary Project Manager assigned to become fully active.</p>
+                    </div>
+                    <button
+                        onClick={() => setShowPmEditModal(true)}
+                        className="ml-auto bg-warning text-dark-900 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white transition"
+                    >
+                        Assign Now
+                    </button>
+                </div>
+            )}
+
             <div className="bg-dark-700 rounded-[2.5rem] p-8 border border-dark-600 shadow-2xl relative overflow-hidden">
                 <div className="flex flex-wrap items-center gap-3 mb-6">
                     <span className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest
@@ -231,11 +276,32 @@ const ProjectDetail = () => {
                         </div>
                     </div>
                     <div className="space-y-1">
-                        <span className="text-[10px] text-dark-500 uppercase font-black tracking-widest">Project Owner</span>
-                        <div className="flex items-center text-white font-bold">
-                            <Users size={14} className="mr-2 text-blue-400" />
-                            {project.owner?.name || 'Unknown'}
+                        <span className="text-[10px] text-dark-500 uppercase font-black tracking-widest">Project Managers</span>
+                        <div className="space-y-1">
+                            {/* Primary PM */}
+                            <div className="flex items-center text-white font-bold">
+                                <Users size={14} className="mr-2 text-blue-400" />
+                                <span className="mr-2">{project.owner?.name || 'Vacant'}</span>
+                                <span className="text-[8px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded uppercase tracking-wider">Primary</span>
+                            </div>
+                            {/* Assistant PM */}
+                            {project.assistantPm && (
+                                <div className="flex items-center text-white font-bold animate-in fade-in slide-in-from-left-2 duration-500">
+                                    <Users size={14} className="mr-2 text-purple-400" />
+                                    <span className="mr-2">{project.assistantPm.name}</span>
+                                    <span className="text-[8px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded uppercase tracking-wider">Assistant</span>
+                                </div>
+                            )}
                         </div>
+                        {/* Edit Managers Button: Super Admin & Project Admin */}
+                        {(user.role === 'super_admin' || user.role === 'project_admin') && (
+                            <button
+                                onClick={() => setShowPmEditModal(true)}
+                                className="mt-2 text-[10px] flex items-center bg-dark-800 hover:bg-dark-600 text-dark-400 hover:text-white px-2 py-1 rounded-lg transition border border-dark-600"
+                            >
+                                <Edit size={10} className="mr-1" /> Edit Managers
+                            </button>
+                        )}
                     </div>
                     <div className="space-y-1">
                         <span className="text-[10px] text-dark-500 uppercase font-black tracking-widest">Overall Progress</span>
@@ -290,7 +356,8 @@ const ProjectDetail = () => {
                                         <Trophy size={24} className="mr-3 text-primary" />
                                         Milestones
                                     </h2>
-                                    {canManage && (
+                                    {/* Milestone Creation: PA & PM Only (SA focuses on PM assignment) */}
+                                    {(user.role === 'project_admin' || (user.role === 'project_manager' && project.owner._id === user.id)) && (
                                         <button
                                             onClick={() => setShowMilestoneModal(true)}
                                             className="bg-dark-800 hover:bg-dark-600 text-white p-3 rounded-xl transition border border-dark-600"
@@ -345,9 +412,43 @@ const ProjectDetail = () => {
                             <div className="bg-dark-700 rounded-[2rem] p-8 border border-dark-600 shadow-xl">
                                 <h3 className="text-lg font-black text-white mb-6 flex items-center uppercase tracking-widest">
                                     <Users size={20} className="mr-3 text-primary" />
-                                    Project Team
+                                    Project Leads
                                 </h3>
                                 <div className="space-y-4">
+                                    {/* Project Managers Section */}
+                                    <div className="space-y-3 mb-6">
+                                        <p className="text-[10px] font-black text-dark-500 uppercase tracking-tighter">Project Managers</p>
+
+                                        {/* Primary PM */}
+                                        {project?.owner && (
+                                            <div className="flex items-center justify-between p-4 bg-primary/10 border border-primary/30 rounded-2xl group hover:bg-primary/20 transition">
+                                                <div className="flex items-center">
+                                                    <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-dark-900 font-black shadow-lg shadow-primary/20">
+                                                        {project.owner.name.charAt(0)}
+                                                    </div>
+                                                    <div className="ml-4">
+                                                        <div className="text-sm font-black text-white">{project.owner.name}</div>
+                                                        <div className="text-[10px] text-primary/70 font-black uppercase tracking-widest">PRIMARY</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Assistant PM */}
+                                        {project?.assistantPm && (
+                                            <div className="flex items-center justify-between p-4 bg-purple-500/10 border border-purple-500/30 rounded-2xl group hover:bg-purple-500/20 transition">
+                                                <div className="flex items-center">
+                                                    <div className="w-10 h-10 rounded-xl bg-purple-500 flex items-center justify-center text-white font-black shadow-lg shadow-purple-500/20">
+                                                        {project.assistantPm.name.charAt(0)}
+                                                    </div>
+                                                    <div className="ml-4">
+                                                        <div className="text-sm font-black text-white">{project.assistantPm.name}</div>
+                                                        <div className="text-[10px] text-purple-400 font-black uppercase tracking-widest">ASSISTANT</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                     {/* Team Leads Section */}
                                     {project?.teamLeads && project.teamLeads.length > 0 && (
                                         <div className="space-y-3 mb-6">
@@ -492,10 +593,26 @@ const ProjectDetail = () => {
                                     required
                                 >
                                     <option value="">Choose User...</option>
-                                    {allUsers.map(u => (
-                                        <option key={u._id} value={u._id}>{u.name} ({u.role.replace('_', ' ')})</option>
-                                    ))}
+                                    {allUsers
+                                        .filter(u => {
+                                            // Super Admin & PA Strict Rule: Show ONLY Project Managers in dropdown
+                                            if (user.role === 'super_admin' || user.role === 'project_admin') {
+                                                return u.role === 'project_manager';
+                                            }
+                                            return true;
+                                        })
+                                        .map(u => (
+                                            <option key={u._id} value={u._id}>
+                                                {u.name}
+                                                {(user.role === 'super_admin' || user.role === 'project_admin') && u.role === 'project_manager'
+                                                    ? ` - ${u.specialization || 'General'} Project Manager`
+                                                    : ` (${u.role.replace('_', ' ')})`}
+                                            </option>
+                                        ))}
                                 </select>
+                                {(user.role === 'super_admin' || user.role === 'project_admin') && (
+                                    <p className="text-[10px] text-dark-500 pt-1 italic">* Restricting list to Project Managers only.</p>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-dark-500 uppercase tracking-widest pl-2">Assign As</label>
@@ -543,6 +660,70 @@ const ProjectDetail = () => {
                                 onChange={e => setMilestoneForm({ ...milestoneForm, dueDate: e.target.value })}
                             />
                             <button type="submit" className="w-full bg-primary hover:bg-primary-hover text-dark-900 h-20 rounded-3xl font-black text-xl">Establish Milestone</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* PM Edit Modal */}
+            {showPmEditModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-dark-900/95 backdrop-blur-md animate-in fade-in">
+                    <div className="bg-dark-700 w-full max-w-lg rounded-[3rem] border border-dark-600 p-10">
+                        <div className="flex justify-between items-center mb-8">
+                            <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Edit Managers</h2>
+                            <button onClick={() => setShowPmEditModal(false)} className="text-dark-500 hover:text-white"><X size={32} /></button>
+                        </div>
+                        <form onSubmit={handleUpdateManagers} className="space-y-6">
+                            <div className="p-4 bg-warning/5 border border-warning/10 rounded-2xl mb-6">
+                                <div className="flex items-start">
+                                    <AlertCircle size={16} className="text-warning mt-1 mr-2 flex-shrink-0" />
+                                    <p className="text-xs text-warning/80 leading-relaxed font-bold">
+                                        Changing Project Managers will be logged in the activity audit trail.
+                                        Primary PM is mandatory.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black text-dark-500 uppercase tracking-widest pl-2">Primary Project Manager <span className="text-danger">*</span></label>
+                                <select
+                                    required
+                                    className="w-full bg-dark-800 border-none rounded-2xl p-5 text-white font-bold h-16 focus:ring-2 focus:ring-primary"
+                                    value={pmEditForm.primaryPmId}
+                                    onChange={e => setPmEditForm({ ...pmEditForm, primaryPmId: e.target.value })}
+                                >
+                                    <option value="">Select Primary PM</option>
+                                    {allUsers.filter(u => u.role === 'project_manager').map(u => (
+                                        <option key={u._id} value={u._id} disabled={u._id === pmEditForm.assistantPmId}>
+                                            {u.name} - {u.specialization || 'General'}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black text-dark-500 uppercase tracking-widest pl-2">Assistant Project Manager (Optional)</label>
+                                <select
+                                    className="w-full bg-dark-800 border-none rounded-2xl p-5 text-white font-bold h-16 focus:ring-2 focus:ring-primary"
+                                    value={pmEditForm.assistantPmId}
+                                    onChange={e => setPmEditForm({ ...pmEditForm, assistantPmId: e.target.value })}
+                                >
+                                    <option value="">None</option>
+                                    {allUsers.filter(u => u.role === 'project_manager').map(u => (
+                                        <option key={u._id} value={u._id} disabled={u._id === pmEditForm.primaryPmId}>
+                                            {u.name} - {u.specialization || 'General'}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <button
+                                type="submit"
+                                className="w-full bg-primary hover:bg-primary-hover text-dark-900 h-20 rounded-3xl font-black text-xl shadow-2xl shadow-primary/20 mt-4"
+                                disabled={!pmEditForm.primaryPmId || pmEditForm.primaryPmId === pmEditForm.assistantPmId}
+                            >
+                                Save Changes
+                            </button>
                         </form>
                     </div>
                 </div>

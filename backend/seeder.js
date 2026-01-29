@@ -9,6 +9,7 @@ const Milestone = require('./models/milestoneModel');
 const Issue = require('./models/issueModel');
 const Template = require('./models/templateModel');
 const Activity = require('./models/activityModel');
+const Team = require('./models/teamModel');
 
 dotenv.config();
 
@@ -35,29 +36,141 @@ const importData = async () => {
         await Issue.deleteMany();
         await Template.deleteMany();
         await Activity.deleteMany();
+        await Team.deleteMany();
         console.log('Data Destroyed...'.red.inverse);
 
         // 2. Create Organization
         const org = await Organization.create({
-            name: "Demo Organization",
+            name: "Dataset Organization",
             status: "active"
         });
 
-        // 3. Create Users
-        const user1 = await User.create({ name: 'Super Admin', email: 'super@demo.com', password: 'password123', role: 'super_admin', organization: org._id });
-        const user2 = await User.create({ name: 'Project Admin', email: 'admin@demo.com', password: 'password123', role: 'project_admin', organization: org._id });
-        const user3 = await User.create({ name: 'Project Manager', email: 'manager@demo.com', password: 'password123', role: 'project_manager', organization: org._id });
-        const user4 = await User.create({ name: 'Team Member', email: 'member@demo.com', password: 'password123', role: 'team_member', organization: org._id });
-        const user5 = await User.create({ name: 'Client User', email: 'client@demo.com', password: 'password123', role: 'client', organization: org._id });
+        // 3. Create Users from Excel
+        const XLSX = require('xlsx');
+        const path = require('path');
+        const excelPath = path.join(__dirname, '..', 'Dummy_Employee_Data_150_Rebalanced.xlsx');
 
-        const users = [user1, user2, user3, user4, user5];
-        console.log(`Created ${users.length} Users`.green);
+        let users = [];
+
+        try {
+            const workbook = XLSX.readFile(excelPath);
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            const excelData = XLSX.utils.sheet_to_json(sheet);
+
+            const roleMap = {
+                'Super Admin': 'super_admin',
+                'Project Manager': 'project_manager',
+                'Team Leader': 'team_leader',
+                'Team Member': 'team_member'
+            };
+
+            for (const row of excelData) {
+                const name = row["Employee's Name"];
+                const roleStr = row["Employee's Role"];
+                const loginId = row['Login ID'];
+                const rawPassword = row['Password'];
+
+                // Construct a fake email if not present, or use loginId if it looks like email
+                // Dataset loginIDs look like 'superadmin01', not emails.
+                // We'll generate a dummy email based on loginID to satisfy schema validation
+                const email = `${loginId}@projectmgmt.com`;
+
+                const systemRole = roleMap[roleStr] || 'team_member'; // Default to team member if unknown
+
+                // Check if user already exists (in case of duplicate login IDs in excel)
+                const exists = users.find(u => u.loginId === loginId);
+                if (!exists) {
+                    const user = await User.create({
+                        name,
+                        email,
+                        loginId,
+                        password: rawPassword, // Will be hashed by pre-save
+                        role: systemRole,
+                        organizationId: org._id,
+                        approvalStatus: 'approved', // Seeded users are approved
+                        passwordHistory: [] // Initialize empty history
+                    });
+                    users.push(user);
+                }
+            }
+            console.log(`Imported ${users.length} Users from Excel`.green);
+
+            // Helper to find user by role
+            const getRole = (r) => users.find(u => u.role === r) || (users.length > 0 ? users[0] : null);
+
+            const superAdmin = getRole('super_admin');
+            let projectManagers = users.filter(u => u.role === 'project_manager');
+            let teamLeaders = users.filter(u => u.role === 'team_leader');
+            let teamMembers = users.filter(u => u.role === 'team_member');
+
+            // Fallback if imported data is insufficient
+            if (projectManagers.length === 0) projectManagers = [users.find(u => u.role === 'project_manager') || superAdmin];
+            if (teamLeaders.length === 0) teamLeaders = [superAdmin];
+            if (teamMembers.length === 0) teamMembers = [superAdmin];
+
+            // 4. Create Teams with Hierarchy
+            const teamNames = ["UI/UX Team", "Backend Team", "Testing / QA Team", "DevOps Team"];
+            const teams = [];
+
+            // Assign PM to all Team Leaders (Simple hierarchy: All TLs report to first PM)
+            const mainPM = projectManagers[0];
+
+            for (let i = 0; i < teamNames.length; i++) {
+                const leader = teamLeaders[i % teamLeaders.length];
+                // Update Leader to report to PM
+                leader.reportsTo = mainPM._id;
+                await leader.save();
+
+                // Create Team
+                const team = await Team.create({
+                    name: teamNames[i],
+                    leader: leader._id,
+                    project: null // Will update later if needed, or keeping it loose for now
+                });
+                teams.push(team);
+
+                // Assign Members to this Team and Leader
+                // distribute members round-robin
+                const teamMemberSubset = teamMembers.filter((_, idx) => idx % teamNames.length === i);
+
+                for (const member of teamMemberSubset) {
+                    member.teamId = team._id;
+                    member.reportsTo = leader._id;
+                    await member.save();
+
+                    // Add to team members array
+                    team.members.push(member._id);
+                }
+                await team.save();
+            }
+            console.log('Created Teams and Assigned Hierarchy'.green);
+
+
+
+
+            // REMOVING DUPLICATE END OF FILE LOGIC
+
+        } catch (err) {
+            console.error(`Error reading Excel: ${err.message}`.red);
+            console.log('Falling back to default users...'.yellow);
+            // Fallback
+            const user1 = await User.create({ name: 'Super Admin', email: 'super@demo.com', loginId: 'superadmin', password: 'password123', role: 'super_admin', organizationId: org._id, approvalStatus: 'approved' });
+            users = [user1];
+        }
+
+        // Helper to find user by role
+        const getRole = (r) => users.find(u => u.role === r) || (users.length > 0 ? users[0] : null);
+
+        const superAdmin = getRole('super_admin');
+        const projectManager = getRole('project_manager');
+        const teamMember = getRole('team_member');
 
         // 4. Create Project Template
         const webTemplate = await Template.create({
             name: "Standard Web Project",
             description: "Default structure for web development projects",
-            createdBy: user1._id,
+            createdBy: superAdmin._id,
             milestones: [
                 { name: "Initial Planning", description: "Define requirements and stack", relativeDueDays: 7 },
                 { name: "Design Phase", description: "UI/UX prototypes", relativeDueDays: 14 },
@@ -79,8 +192,8 @@ const importData = async () => {
             priority: "High",
             startDate: new Date(),
             endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            owner: user3._id,
-            members: [user4._id]
+            owner: projectManager._id,
+            members: [teamMember._id]
         });
 
         const p2 = await Project.create({
@@ -90,8 +203,8 @@ const importData = async () => {
             priority: "Medium",
             startDate: new Date(),
             endDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
-            owner: user2._id,
-            members: [user4._id, user5._id]
+            owner: projectManager._id,
+            members: [teamMember._id]
         });
 
         const p3 = await Project.create({
@@ -101,8 +214,8 @@ const importData = async () => {
             priority: "High",
             startDate: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
             endDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-            owner: user1._id,
-            members: [user3._id]
+            owner: superAdmin._id,
+            members: [projectManager._id]
         });
 
         console.log('Created 3 Projects'.green);
@@ -116,9 +229,9 @@ const importData = async () => {
 
         // 7. Create Activities
         await Activity.create([
-            { project: p1._id, user: user3._id, action: "Created", details: "Project initiated by manager" },
-            { project: p1._id, user: user4._id, action: "Milestone Updated", details: 'Milestone "Infrastucture Audit" marked as Completed' },
-            { project: p2._id, user: user2._id, action: "Status Changed", details: "Status updated to On Hold due to resource shift" }
+            { project: p1._id, user: projectManager._id, action: "Created", details: "Project initiated by manager" },
+            { project: p1._id, user: teamMember._id, action: "Milestone Updated", details: 'Milestone "Infrastucture Audit" marked as Completed' },
+            { project: p2._id, user: projectManager._id, action: "Status Changed", details: "Status updated to On Hold due to resource shift" }
         ]);
 
         console.log('Data Imported!'.green.inverse);
@@ -140,6 +253,7 @@ const destroyData = async () => {
         await Issue.deleteMany();
         await Template.deleteMany();
         await Activity.deleteMany();
+        await Team.deleteMany();
 
         console.log('Data Destroyed!'.red.inverse);
         process.exit();

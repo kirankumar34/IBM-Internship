@@ -13,6 +13,12 @@ app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
 
+// Load Models (to ensure schemas are registered)
+require('./models/userModel');
+require('./models/teamModel');
+require('./models/projectModel');
+require('./models/taskModel');
+
 // Database Connection
 const connectDB = async () => {
     try {

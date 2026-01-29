@@ -97,9 +97,56 @@ const deleteUser = asyncHandler(async (req, res) => {
     res.json({ message: 'User removed' });
 });
 
+// @desc    Approve a user (Hierarchy enforced)
+// @route   PUT /api/users/:id/approve
+// @access  Private
+const approveUser = asyncHandler(async (req, res) => {
+    const userToApprove = await User.findById(req.params.id);
+    if (!userToApprove) {
+        res.status(404);
+        throw new Error('User not found');
+    }
+
+    const { role: approverRole } = req.user;
+    const { requestedRole } = userToApprove; // Or use role if it was set directly
+
+    // Approval Hierarchy
+    const approvalMap = {
+        'team_member': 'team_leader', // Team Member approved by Team Leader
+        'team_leader': 'project_manager', // Team Leader approved by PM
+        'project_manager': 'super_admin' // PM approved by Super Admin
+    };
+
+    const requiredApprover = approvalMap[requestedRole || userToApprove.role];
+
+    // Allow Super Admin to approve anyone (optional, but good for testing)
+    const isSuperAdmin = approverRole === 'super_admin';
+
+    if (approverRole !== requiredApprover && !isSuperAdmin) {
+        res.status(403);
+        throw new Error(`You cannot approve a ${requestedRole || userToApprove.role}. Required: ${requiredApprover}`);
+    }
+
+    userToApprove.approvalStatus = 'approved';
+    userToApprove.role = requestedRole || userToApprove.role; // Confirm role
+    if (req.body.action === 'reject') {
+        userToApprove.approvalStatus = 'rejected';
+        // Maybe delete user or keep as rejected? Requirement says "On rejection: User blocked with message"
+        // So keeping them as rejected is fine.
+    } else {
+        // Assign reportsTo automatically based on approver?
+        // "Approved By Team Leader" -> implies reporting?
+        userToApprove.reportsTo = req.user.id;
+    }
+
+    const updatedUser = await userToApprove.save();
+    res.json(updatedUser);
+});
+
 module.exports = {
     getUsers,
     createUser,
     updateUser,
-    deleteUser
+    deleteUser,
+    approveUser
 };

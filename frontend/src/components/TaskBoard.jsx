@@ -36,6 +36,74 @@ const TaskBoard = ({ projectId, members }) => {
         dependencies: []
     });
 
+    // Process members for dropdown (Team based)
+    // PM: See Team Leads grouped by Team
+    // TL: See Team Members of their Team
+    // Member: Cannot Assign (Should likely be hidden, but we'll disable)
+    const getAssignableOptions = () => {
+        if (!members) return [];
+        const currentRole = user.role;
+        const currentId = user._id || user.id;
+
+        if (['super_admin', 'project_manager'].includes(currentRole)) {
+            // PM sees Team Leads. Grouped by Team.
+            const groups = {};
+            let hasLeads = false;
+
+            members.forEach(m => {
+                const isLead = m.role === 'team_leader';
+                if (isLead) {
+                    hasLeads = true;
+                    const teamName = m.teamId?.name || 'Unassigned Leads';
+                    if (!groups[teamName]) groups[teamName] = [];
+                    groups[teamName].push(m);
+                }
+            });
+
+            // Fallback for Admin/PM if no structure exists yet
+            if (!hasLeads) {
+                // return all members grouped by team (if they have one) or 'General'
+                members.forEach(m => {
+                    const teamName = m.teamId?.name || 'General Members';
+                    if (!groups[teamName]) groups[teamName] = [];
+                    groups[teamName].push(m);
+                });
+            }
+            return Object.entries(groups).map(([team, users]) => ({ label: team, options: users }));
+        }
+
+        if (currentRole === 'team_leader') {
+            // TL sees Members of THEIR Team
+            const myTeamId = user.teamId?._id || user.teamId;
+
+            // Try matching by ID first
+            let myMembers = [];
+            if (myTeamId) {
+                myMembers = members.filter(m => {
+                    const mTeamId = m.teamId?._id || m.teamId;
+                    return m.role === 'team_member' && mTeamId === myTeamId;
+                });
+            }
+
+            // Fallback: If no teamID found for me, or no members found with that team ID
+            // Maybe I am "Unassigned" but members report to me?
+            if (myMembers.length === 0) {
+                myMembers = members.filter(m => m.reportsTo === currentId || m.reportsTo?._id === currentId);
+            }
+
+            if (myMembers.length > 0) {
+                return [{ label: user.teamId?.name || 'My Team', options: myMembers }];
+            }
+            // Strict Mode: return empty if no members found.
+            return [];
+        }
+
+        return [];
+    };
+
+    const assignableGroups = getAssignableOptions();
+
+
 
     useEffect(() => {
         fetchTasks();
@@ -364,10 +432,26 @@ const TaskBoard = ({ projectId, members }) => {
                                         onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
                                     >
                                         <option value="">Unassigned</option>
-                                        {members && members.map(m => (
+
+                                        {/* Standard List Fallback if no groups (e.g. mixed/older projects) */}
+                                        {assignableGroups.length === 0 && members && members.map(m => (
                                             <option key={m._id} value={m._id}>{m.name}</option>
                                         ))}
+
+                                        {/* Grouped Options */}
+                                        {assignableGroups.map(group => (
+                                            <optgroup key={group.label} label={group.label} className="font-bold text-primary bg-dark-800">
+                                                {group.options.map(m => (
+                                                    <option key={m._id} value={m._id} className="text-white bg-dark-700">
+                                                        {m.name} ({m.role.replace('_', ' ')})
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        ))}
                                     </select>
+                                    {assignableGroups.length === 0 && members.length > 0 && user.role !== 'team_member' && (
+                                        <p className="text-[10px] text-warning mt-1">Warning: No team structure detected. Showing flat list.</p>
+                                    )}
                                 </div>
                             </div>
 

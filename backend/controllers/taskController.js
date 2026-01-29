@@ -75,6 +75,32 @@ const createTask = asyncHandler(async (req, res) => {
         status: 'To Do'
     });
 
+    // Enforce Assignment Rules
+    if (assignedTo) {
+        const User = require('../models/userModel');
+        const assignee = await User.findById(assignedTo);
+
+        if (req.user.role === 'project_manager') {
+            // PM can only assign to Team Leaders
+            if (assignee && assignee.role !== 'team_leader') {
+                res.status(403);
+                await task.deleteOne(); // Rollback
+                throw new Error('Project Managers can only assign tasks to Team Leaders');
+            }
+        } else if (req.user.role === 'team_leader') {
+            // TL can only assign to their Team Members
+            // Check if assignee reports to this TL or is in same team
+            const isTeamMember = assignee.reportsTo?.toString() === req.user.id.toString() ||
+                (assignee.teamId && assignee.teamId.toString() === req.user.teamId?.toString());
+
+            if (!isTeamMember) {
+                res.status(403);
+                await task.deleteOne(); // Rollback
+                throw new Error('Team Leaders can only assign tasks to their own team members');
+            }
+        }
+    }
+
     res.status(201).json(task);
 });
 

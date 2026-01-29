@@ -6,6 +6,11 @@ const userSchema = mongoose.Schema({
         type: String,
         required: true,
     },
+    loginId: {
+        type: String,
+        required: true,
+        unique: true,
+    },
     email: {
         type: String,
         required: true,
@@ -17,12 +22,34 @@ const userSchema = mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['super_admin', 'project_manager', 'team_leader', 'team_member', 'client'],
+        enum: ['super_admin', 'project_admin', 'project_manager', 'team_leader', 'team_member', 'client'],
         default: 'client',
     },
+    specialization: {
+        type: String, // e.g., 'UI/UX', 'Frontend', 'Backend'
+        default: 'General'
+    },
+    approvalStatus: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'pending' // Default to pending, clients will be auto-approved in controller
+    },
+    requestedRole: {
+        type: String,
+        enum: ['super_admin', 'project_manager', 'team_leader', 'team_member', 'client'],
+    },
+    passwordHistory: [{
+        type: String
+    }],
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
     organizationId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Organization',
+    },
+    teamId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Team'
     },
     reportsTo: {
         type: mongoose.Schema.Types.ObjectId,

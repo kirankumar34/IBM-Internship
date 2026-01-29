@@ -1,5 +1,5 @@
 import { useState, useContext } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { UserPlus, Mail, Lock, UserCheck } from 'lucide-react';
@@ -24,14 +24,32 @@ const Register = () => {
         'null': allRoles // Show all roles for public registration as requested
     };
 
+    const [searchParams] = useSearchParams();
+    const type = searchParams.get('type') || 'client';
+    const isMemberRegister = type === 'member';
+
     const currentRoleKey = currentUser ? currentUser.role : 'null';
-    const allowedOptions = rolePermissions[currentRoleKey] || allRoles;
+
+    // Filter roles based on registration type
+    let allowedOptions = rolePermissions[currentRoleKey] || allRoles;
+
+    if (!currentUser) {
+        if (isMemberRegister) {
+            allowedOptions = [
+                { value: 'team_member', label: 'Team Member' },
+                { value: 'team_leader', label: 'Team Leader' },
+                { value: 'project_manager', label: 'Project Manager' }
+            ];
+        } else {
+            allowedOptions = [{ value: 'client', label: 'Client' }];
+        }
+    }
 
     const [formData, setFormData] = useState({
         name: '',
         email: '',
         password: '',
-        role: allowedOptions[0]?.value || 'client'
+        role: allowedOptions[0]?.value || (isMemberRegister ? 'team_member' : 'client')
     });
 
     const { name, email, password, role } = formData;
@@ -47,13 +65,22 @@ const Register = () => {
         e.preventDefault();
         try {
             const res = await register(formData);
-            toast.success(currentUser ? `User Created: ${role}` : 'Registration successful!');
 
-            // If someone is already logged in (Admin creating user), stay here or go to team
-            if (currentUser) {
-                navigate('/team');
+            // Check if approval is pending (no token usually implies this in our new logic, or we check response message)
+            // But register function in context might auto-set user if token is present.
+            // If response indicates pending, show toast and redirect to login
+
+            if (res && res.approvalStatus === 'pending') {
+                toast.info('Account created! Please wait for approval.');
+                navigate('/login');
             } else {
-                navigate('/');
+                toast.success(currentUser ? `User Created: ${role}` : 'Registration successful!');
+                // If someone is already logged in (Admin creating user), stay here or go to team
+                if (currentUser) {
+                    navigate('/team');
+                } else {
+                    navigate('/'); // Auto logged in
+                }
             }
         } catch (error) {
             toast.error(error.response?.data?.message || 'Registration failed');
@@ -68,12 +95,12 @@ const Register = () => {
                         <UserPlus size={32} />
                     </div>
                     <h2 className="text-3xl font-bold text-white tracking-tight">
-                        {currentUser ? 'Add New User' : 'Create Account'}
+                        {currentUser ? 'Add New User' : `Register as ${isMemberRegister ? 'Member' : 'Client'}`}
                     </h2>
                     <p className="mt-2 text-dark-500">
                         {currentUser
                             ? `As ${currentUser.role.replace('_', ' ')}, you can add ${allowedOptions.map(o => o.label).join(', ')}.`
-                            : 'Join our project management workspace.'}
+                            : (isMemberRegister ? 'Join the team. Approval required.' : 'Create a client account for project access.')}
                     </p>
                 </div>
 

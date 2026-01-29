@@ -19,7 +19,8 @@ export const AuthProvider = ({ children }) => {
 
     const register = async (userData) => {
         const response = await api.post('/auth/register', userData);
-        if (response.data) {
+        // Only log in if a token is returned (self-registration of approved user)
+        if (response.data && response.data.token) {
             localStorage.setItem('user', JSON.stringify(response.data));
             setUser(response.data);
         }
@@ -28,7 +29,7 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (userData) => {
         const response = await api.post('/auth/login', userData);
-        if (response.data) {
+        if (response.data && response.data.token) {
             localStorage.setItem('user', JSON.stringify(response.data));
             setUser(response.data);
         }

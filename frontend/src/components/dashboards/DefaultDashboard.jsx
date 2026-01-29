@@ -88,7 +88,8 @@ const DefaultDashboard = () => {
         }
     };
 
-    const canCreate = ['super_admin', 'project_admin', 'project_manager'].includes(user?.role);
+    // Strict Rule: No UI creation for projects. System/Seed only.
+    const canCreate = false; // Disable create button globally in dashboard
 
     // Metrics Calculation
     const totalProjects = projects.length;

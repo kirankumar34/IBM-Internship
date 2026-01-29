@@ -24,6 +24,10 @@ const projectSchema = mongoose.Schema({
         ref: 'User',
         required: true,
     },
+    assistantPm: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
     members: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
