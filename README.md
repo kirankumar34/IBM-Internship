@@ -1,5 +1,5 @@
 <<<<<<< HEAD
-# Project Management Application (Module 2)
+# Project Management Application (Module 3 & 4)
 
 A full-stack MERN (MongoDB, Express, React, Node.js) application for project management with role-based access control, project templates, and milestone tracking.
 
