@@ -25,12 +25,8 @@ router.use(protect);
 router.get('/', getProjects);
 router.get('/:id', getProject);
 
-// Strict: PM or above can create projects
-// Strict Rule: Projects created by System Seed/Import logic mostly. 
-// We restrict UI creation for SuperAdmin/PA as per new rules.
-// Keeping it technically available for future system-admin roles or specific scripts if needed, 
-// but removing 'super_admin' and 'project_admin' implies they can't do it via API.
-router.post('/', authorize('system_admin'), createProject);
+// Super Admin can create projects (re-enabled as per Module 5 requirements)
+router.post('/', authorize('super_admin'), createProject);
 router.put('/:id', authorize('super_admin', 'project_manager'), updateProject);
 router.put('/:id/managers', authorize('super_admin', 'project_admin'), updateProjectManagers);
 router.patch('/:id/archive', authorize('super_admin', 'project_manager'), archiveProject);

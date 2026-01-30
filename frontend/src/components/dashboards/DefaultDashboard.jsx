@@ -88,8 +88,8 @@ const DefaultDashboard = () => {
         }
     };
 
-    // Strict Rule: No UI creation for projects. System/Seed only.
-    const canCreate = false; // Disable create button globally in dashboard
+    // Re-enabled for Super Admin as per Module 5 requirements
+    const canCreate = user?.role === 'super_admin';
 
     // Metrics Calculation
     const totalProjects = projects.length;

@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const asyncHandler = require('express-async-handler');
 const User = require('../models/userModel');
+const LoginActivity = require('../models/loginActivityModel');
 
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET || 'fallback_secret_do_not_use_in_prod', {
@@ -123,6 +124,14 @@ const loginUser = asyncHandler(async (req, res) => {
 
     console.log(`[LOGIN SUCCESS] User: ${user.name} (${user.role})`);
 
+    // Track login activity
+    await LoginActivity.create({
+        user: user._id,
+        loginTime: new Date(),
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent')
+    });
+
     res.json({
         _id: user.id,
         name: user.name,
@@ -222,9 +231,27 @@ const getMe = asyncHandler(async (req, res) => {
     res.json(req.user);
 });
 
+// @desc    Logout user and track activity
+// @route   POST /api/auth/logout
+// @access  Private
+const logoutUser = asyncHandler(async (req, res) => {
+    // Find the most recent active session for this user
+    const latestSession = await LoginActivity.findOne({
+        user: req.user.id,
+        logoutTime: null
+    }).sort({ loginTime: -1 });
+
+    if (latestSession) {
+        await latestSession.logout(); // Use the model method
+    }
+
+    res.json({ message: 'Logged out successfully' });
+});
+
 module.exports = {
     registerUser,
     loginUser,
+    logoutUser,
     getMe,
     forgotPassword,
     resetPassword,

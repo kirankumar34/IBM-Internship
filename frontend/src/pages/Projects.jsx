@@ -74,9 +74,8 @@ const Projects = () => {
         return matchesStatus && matchesSearch;
     });
 
-    // Strict Rule: Projects are created via System Seed/Import only.
-    // Super Admin and Project Admin cannot create projects.
-    const canCreate = false; // Disable for all UI based creation as per new rules.
+    // Re-enabled for Super Admin as per Module 5 requirements
+    const canCreate = user?.role === 'super_admin';
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
