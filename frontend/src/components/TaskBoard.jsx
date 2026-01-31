@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import api from '../context/api';
 import { toast } from 'react-toastify';
+import CommentSection from './collaboration/CommentSection';
+import FileUpload from './collaboration/FileUpload';
+import TimerWidget from './time/TimerWidget';
+import TimeLogForm from './time/TimeLogForm';
 import {
     Plus,
     Calendar,
@@ -12,7 +16,9 @@ import {
     X,
     Clock,
     Link as LinkIcon,
-    ListTodo
+    ListTodo,
+    MessageCircle,
+    Files
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -45,31 +51,23 @@ const TaskBoard = ({ projectId, members }) => {
         const currentRole = user.role;
         const currentId = user._id || user.id;
 
-        if (['super_admin', 'project_manager'].includes(currentRole)) {
-            // PM sees Team Leads. Grouped by Team.
-            const groups = {};
-            let hasLeads = false;
-
+        if (currentRole === 'super_admin' || currentRole === 'project_admin') {
+            // Admins can see everyone, maybe grouped by Role
+            const groups = { 'Team Leads': [], 'Team Members': [] };
             members.forEach(m => {
-                const isLead = m.role === 'team_leader';
-                if (isLead) {
-                    hasLeads = true;
-                    const teamName = m.teamId?.name || 'Unassigned Leads';
-                    if (!groups[teamName]) groups[teamName] = [];
-                    groups[teamName].push(m);
-                }
+                if (m.role === 'team_leader') groups['Team Leads'].push(m);
+                else if (m.role === 'team_member') groups['Team Members'].push(m);
             });
+            return Object.entries(groups).map(([role, users]) => ({ label: role, options: users }));
+        }
 
-            // Fallback for Admin/PM if no structure exists yet
-            if (!hasLeads) {
-                // return all members grouped by team (if they have one) or 'General'
-                members.forEach(m => {
-                    const teamName = m.teamId?.name || 'General Members';
-                    if (!groups[teamName]) groups[teamName] = [];
-                    groups[teamName].push(m);
-                });
+        if (currentRole === 'project_manager') {
+            // PM Restriction: ONLY Team Leads
+            const teamLeads = members.filter(m => m.role === 'team_leader');
+            if (teamLeads.length > 0) {
+                return [{ label: 'Team Leaders', options: teamLeads }];
             }
-            return Object.entries(groups).map(([team, users]) => ({ label: team, options: users }));
+            return [];
         }
 
         if (currentRole === 'team_leader') {
@@ -373,6 +371,34 @@ const TaskBoard = ({ projectId, members }) => {
                                     ) : (
                                         <p className="text-xs text-dark-500 italic py-4 text-center border-2 border-dashed border-dark-600 rounded-xl">No dependencies mapped.</p>
                                     )}
+                                </div>
+                            </section>
+
+                            <section className="pt-6 border-t border-dark-600">
+                                <h3 className="text-xs font-bold text-dark-400 uppercase tracking-widest mb-6 flex items-center">
+                                    <Clock size={16} className="mr-2 text-primary" /> Time Tracking
+                                </h3>
+                                <div className="space-y-6">
+                                    <TimerWidget taskId={selectedTask._id} projectId={projectId} />
+                                    <div className="bg-dark-800 p-4 rounded-xl border border-dark-600">
+                                        <h4 className="text-[10px] font-black uppercase text-dark-400 mb-4">Manual Log</h4>
+                                        <TimeLogForm taskId={selectedTask._id} projectId={projectId} onLogAdded={() => fetchTasks()} />
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section className="pt-6 border-t border-dark-600">
+                                <h3 className="text-xs font-bold text-dark-400 uppercase tracking-widest mb-6 flex items-center">
+                                    <MessageCircle size={16} className="mr-2 text-blue-400" /> Collaboration
+                                </h3>
+                                <div className="space-y-8">
+                                    <CommentSection taskId={selectedTask._id} />
+                                    <div className="pt-6 border-t border-dark-800/50">
+                                        <h4 className="text-xs font-bold text-dark-400 uppercase tracking-widest mb-4 flex items-center">
+                                            <Files size={14} className="mr-2" /> Attachments
+                                        </h4>
+                                        <FileUpload taskId={selectedTask._id} projectId={projectId} />
+                                    </div>
                                 </div>
                             </section>
                         </div>

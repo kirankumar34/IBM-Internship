@@ -1,0 +1,143 @@
+[
+  {
+    "userId": "697d8893c676634b67ce480f",
+    "userName": "Rahul Mehta",
+    "role": "TEAM_MEMBER",
+    "projectId": "697d8894c676634b67ce4829",
+    "projectName": "University Internal Portal",
+    "weekRange": "2026-01-26_to_2026-02-01",
+    "entries": [
+      {
+        "day": "MON",
+        "task": "Dashboard UI Fixes",
+        "hours": 7.163436944444444
+      },
+      {
+        "day": "TUE",
+        "task": "Client Feedback Implementation",
+        "hours": 8.955812222222223
+      },
+      {
+        "day": "WED",
+        "task": "Dashboard UI Fixes",
+        "hours": 8.219084444444444
+      },
+      {
+        "day": "THU",
+        "task": "Client Feedback Implementation",
+        "hours": 7.723178055555556
+      },
+      {
+        "day": "FRI",
+        "task": "Dashboard UI Fixes",
+        "hours": 7.542152222222223
+      },
+      {
+        "day": "SAT",
+        "task": null,
+        "hours": 0
+      },
+      {
+        "day": "SUN",
+        "task": null,
+        "hours": 0
+      }
+    ],
+    "totalHours": 39.6,
+    "approvalStatus": "PENDING"
+  },
+  {
+    "userId": "697d8893c676634b67ce4818",
+    "userName": "Arjun Rao",
+    "role": "TEAM_MEMBER",
+    "projectId": "697d8894c676634b67ce4829",
+    "projectName": "University Internal Portal",
+    "weekRange": "2026-01-26_to_2026-02-01",
+    "entries": [
+      {
+        "day": "MON",
+        "task": "API Integration",
+        "hours": 7.748983055555556
+      },
+      {
+        "day": "TUE",
+        "task": "Database Optimization",
+        "hours": 8.048536111111112
+      },
+      {
+        "day": "WED",
+        "task": "API Integration",
+        "hours": 7.145823055555556
+      },
+      {
+        "day": "THU",
+        "task": "Database Optimization",
+        "hours": 8.665542777777778
+      },
+      {
+        "day": "FRI",
+        "task": "API Integration",
+        "hours": 7.943879722222222
+      },
+      {
+        "day": "SAT",
+        "task": null,
+        "hours": 0
+      },
+      {
+        "day": "SUN",
+        "task": null,
+        "hours": 0
+      }
+    ],
+    "totalHours": 39.6,
+    "approvalStatus": "PENDING"
+  },
+  {
+    "userId": "697d8894c676634b67ce481b",
+    "userName": "Pooja Nair",
+    "role": "TEAM_MEMBER",
+    "projectId": "697d8894c676634b67ce4829",
+    "projectName": "University Internal Portal",
+    "weekRange": "2026-01-26_to_2026-02-01",
+    "entries": [
+      {
+        "day": "MON",
+        "task": "Login Module Testing",
+        "hours": 7.170398333333333
+      },
+      {
+        "day": "TUE",
+        "task": "Client Feedback Implementation",
+        "hours": 8.691314166666666
+      },
+      {
+        "day": "WED",
+        "task": "Login Module Testing",
+        "hours": 8.837644722222223
+      },
+      {
+        "day": "THU",
+        "task": "Client Feedback Implementation",
+        "hours": 7.66313
+      },
+      {
+        "day": "FRI",
+        "task": "Login Module Testing",
+        "hours": 8.373739722222222
+      },
+      {
+        "day": "SAT",
+        "task": "Client Feedback Implementation",
+        "hours": 2.4445616666666665
+      },
+      {
+        "day": "SUN",
+        "task": null,
+        "hours": 0
+      }
+    ],
+    "totalHours": 43.2,
+    "approvalStatus": "PENDING"
+  }
+]

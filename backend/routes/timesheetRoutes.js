@@ -147,6 +147,14 @@ const approveTimesheet = asyncHandler(async (req, res) => {
     await timesheet.save();
     await timesheet.populate('approver', 'name');
 
+    // Audit Log
+    const Activity = require('../models/activityModel');
+    await Activity.create({
+        user: req.user.id,
+        action: 'Timesheet Approved',
+        details: `Weekly timesheet (Start: ${timesheet.weekStartDate.toLocaleDateString()}) for ${timesheet.user.name} was approved.`
+    });
+
     res.json(timesheet);
 });
 
@@ -178,6 +186,15 @@ const rejectTimesheet = asyncHandler(async (req, res) => {
     timesheet.approver = req.user.id;
 
     await timesheet.save();
+
+    // Audit Log
+    const Activity = require('../models/activityModel');
+    await Activity.create({
+        user: req.user.id,
+        action: 'Timesheet Rejected',
+        details: `Weekly timesheet (Start: ${timesheet.weekStartDate.toLocaleDateString()}) for ${timesheet.user.name} was rejected. Reason: ${timesheet.rejectionReason}`
+    });
+
     res.json(timesheet);
 });
 

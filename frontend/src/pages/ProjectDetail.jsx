@@ -3,6 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../context/api';
 import { toast } from 'react-toastify';
 import TaskBoard from '../components/TaskBoard';
+import CommentSection from '../components/collaboration/CommentSection';
+import FileUpload from '../components/collaboration/FileUpload';
+import ProjectAnalyticsCharts from '../components/admin/ProjectAnalyticsCharts';
+import WeeklyTimesheetView from '../components/time/WeeklyTimesheetView';
+import EmployeeActivityView from '../components/admin/EmployeeActivityView';
+import TimesheetAnalytics from '../components/admin/TimesheetAnalytics';
 import {
     Calendar,
     Users,
@@ -20,7 +26,10 @@ import {
     LayoutGrid,
     ListTodo,
     X,
-    Shield
+    Shield,
+    MessageCircle,
+    Files,
+    Download
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -53,12 +62,6 @@ const ProjectDetail = () => {
             const res = await api.get(`/projects/${id}`);
             setProject(res.data);
             setMilestones(res.data.milestones || []);
-            setEditForm({
-                name: res.data.name,
-                description: res.data.description,
-                status: res.data.status,
-                priority: res.data.priority
-            });
             setEditForm({
                 name: res.data.name,
                 description: res.data.description,
@@ -166,6 +169,30 @@ const ProjectDetail = () => {
             fetchData();
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to update managers');
+        }
+    };
+
+    const handleDownloadReport = async () => {
+        try {
+            toast.info('Generating PDF report...');
+            // Using direct axios call for blob handling
+            const token = localStorage.getItem('token');
+            const response = await api.get(`/analytics/project/${id}/pdf`, {
+                headers: { Authorization: `Bearer ${token}` },
+                responseType: 'blob'
+            });
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Project_Report_${project.name}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            toast.success('Report downloaded successfully');
+        } catch (err) {
+            console.error('Download error:', err);
+            toast.error('Failed to generate report');
         }
     };
 
@@ -326,22 +353,57 @@ const ProjectDetail = () => {
                 <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl pointer-events-none"></div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex space-x-1 bg-dark-800/50 p-1.5 rounded-2xl w-fit border border-dark-600">
-                <button
-                    onClick={() => setActiveTab('overview')}
-                    className={`px-8 py-3 rounded-xl text-sm font-black uppercase tracking-widest transition-all
-                        ${activeTab === 'overview' ? 'bg-dark-700 text-white shadow-xl' : 'text-dark-400 hover:text-white'}`}
-                >
-                    Overview
-                </button>
-                <button
-                    onClick={() => setActiveTab('tasks')}
-                    className={`px-8 py-3 rounded-xl text-sm font-black uppercase tracking-widest transition-all
-                        ${activeTab === 'tasks' ? 'bg-dark-700 text-white shadow-xl' : 'text-dark-400 hover:text-white'}`}
-                >
-                    Tasks Board
-                </button>
+            {/* Tabs & Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap gap-1.5 bg-dark-800/50 p-1.5 rounded-2xl border border-dark-600">
+                    <button
+                        onClick={() => setActiveTab('overview')}
+                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
+                            ${activeTab === 'overview' ? 'bg-dark-700 text-white shadow-xl' : 'text-dark-400 hover:text-white'}`}
+                    >
+                        Overview
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('tasks')}
+                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
+                            ${activeTab === 'tasks' ? 'bg-dark-700 text-white shadow-xl' : 'text-dark-400 hover:text-white'}`}
+                    >
+                        Tasks Board
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('collaboration')}
+                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
+                            ${activeTab === 'collaboration' ? 'bg-dark-700 text-white shadow-xl' : 'text-dark-400 hover:text-white'}`}
+                    >
+                        Collaboration
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('time')}
+                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
+                            ${activeTab === 'time' ? 'bg-dark-700 text-white shadow-xl' : 'text-dark-400 hover:text-white'}`}
+                    >
+                        Time Tracking
+                    </button>
+                    {(user?.role === 'super_admin' || user?.role === 'project_manager' || user?.role === 'team_leader') && (
+                        <button
+                            onClick={() => setActiveTab('analytics')}
+                            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
+                                ${activeTab === 'analytics' ? 'bg-dark-700 text-white shadow-xl' : 'text-dark-400 hover:text-white'}`}
+                        >
+                            Analytics
+                        </button>
+                    )}
+                </div>
+
+                {(user?.role === 'super_admin' || user?.role === 'project_manager') && (
+                    <button
+                        onClick={handleDownloadReport}
+                        className="flex items-center space-x-2 bg-dark-700 hover:bg-dark-600 text-white px-6 py-3 rounded-2xl border border-dark-600 font-black text-[10px] uppercase tracking-widest transition group"
+                    >
+                        <Download size={16} className="text-primary group-hover:scale-110 transition" />
+                        <span>Download Progress Report</span>
+                    </button>
+                )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -527,6 +589,29 @@ const ProjectDetail = () => {
                         <TaskBoard projectId={project._id} members={[...(project.members || []), ...(project.teamLeads || [])]} />
                     </div>
                 )}
+
+                {activeTab === 'collaboration' && (
+                    <div className="lg:col-span-3 space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-500">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <CommentSection projectId={project._id} />
+                            <FileUpload projectId={project._id} />
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'time' && (
+                    <div className="lg:col-span-3 animate-in fade-in slide-in-from-bottom-10 duration-500">
+                        <WeeklyTimesheetView />
+                    </div>
+                )}
+
+                {activeTab === 'analytics' && user?.role === 'super_admin' && (
+                    <div className="lg:col-span-3 space-y-12 animate-in fade-in slide-in-from-bottom-10 duration-500">
+                        <ProjectAnalyticsCharts projectId={project._id} />
+                        <EmployeeActivityView projectId={project._id} />
+                        <TimesheetAnalytics projectId={project._id} />
+                    </div>
+                )}
             </div>
 
             {/* Modals Container */}
@@ -599,6 +684,10 @@ const ProjectDetail = () => {
                                             if (user.role === 'super_admin' || user.role === 'project_admin') {
                                                 return u.role === 'project_manager';
                                             }
+                                            // PM Rule: Show ONLY Team Leaders
+                                            if (user.role === 'project_manager') {
+                                                return u.role === 'team_leader';
+                                            }
                                             return true;
                                         })
                                         .map(u => (
@@ -613,6 +702,9 @@ const ProjectDetail = () => {
                                 {(user.role === 'super_admin' || user.role === 'project_admin') && (
                                     <p className="text-[10px] text-dark-500 pt-1 italic">* Restricting list to Project Managers only.</p>
                                 )}
+                                {user.role === 'project_manager' && (
+                                    <p className="text-[10px] text-dark-500 pt-1 italic">* Restricting list to Team Leaders only.</p>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-dark-500 uppercase tracking-widest pl-2">Assign As</label>
@@ -621,8 +713,15 @@ const ProjectDetail = () => {
                                     value={memberForm.roleAs}
                                     onChange={e => setMemberForm({ ...memberForm, roleAs: e.target.value })}
                                 >
-                                    <option value="member">Standard Member</option>
-                                    <option value="team_lead">Team Lead</option>
+                                    {/* PMs can only assign Team Leaders */}
+                                    {user.role === 'project_manager' ? (
+                                        <option value="team_leader">Team Lead</option>
+                                    ) : (
+                                        <>
+                                            <option value="member">Standard Member</option>
+                                            <option value="team_lead">Team Lead</option>
+                                        </>
+                                    )}
                                 </select>
                             </div>
                             <button type="submit" className="w-full bg-primary hover:bg-primary-hover text-dark-900 h-20 rounded-3xl font-black text-xl">Deploy to Project</button>

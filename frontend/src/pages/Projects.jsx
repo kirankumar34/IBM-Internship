@@ -22,6 +22,7 @@ const Projects = () => {
     const [search, setSearch] = useState('');
     const [showArchived, setShowArchived] = useState(false);
     const [templates, setTemplates] = useState([]);
+    const [pms, setPms] = useState([]);
     const [showModal, setShowModal] = useState(false);
 
     // Form State
@@ -31,12 +32,15 @@ const Projects = () => {
         startDate: '',
         endDate: '',
         priority: 'Medium',
-        templateId: ''
+        templateId: '',
+        primaryPmId: '',
+        assistantPmId: ''
     });
 
     useEffect(() => {
         fetchProjects();
         fetchTemplates();
+        fetchPMs();
     }, [filter, showArchived]);
 
     const fetchProjects = async () => {
@@ -55,14 +59,36 @@ const Projects = () => {
         } catch (err) { }
     };
 
+    const fetchPMs = async () => {
+        try {
+            const res = await api.get('/users');
+            setPms(res.data.filter(u => u.role === 'project_manager'));
+        } catch (err) {
+            console.error('Failed to load PMs');
+        }
+    };
+
     const handleCreateProject = async (e) => {
         e.preventDefault();
+        if (!formData.primaryPmId) {
+            toast.error('Primary Project Manager is required');
+            return;
+        }
         try {
             await api.post('/projects', formData);
             toast.success('Project created successfully');
             setShowModal(false);
             fetchProjects();
-            setFormData({ name: '', description: '', startDate: '', endDate: '', priority: 'Medium', templateId: '' });
+            setFormData({
+                name: '',
+                description: '',
+                startDate: '',
+                endDate: '',
+                priority: 'Medium',
+                templateId: '',
+                primaryPmId: '',
+                assistantPmId: ''
+            });
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to create project');
         }
@@ -298,6 +324,33 @@ const Projects = () => {
                                         <option value="">No Template</option>
                                         {templates.map(t => (
                                             <option key={t._id} value={t._id}>{t.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black text-dark-400 uppercase tracking-widest ml-1 text-primary">Primary PM *</label>
+                                    <select
+                                        required
+                                        className="w-full bg-dark-800 border-none rounded-2xl p-4 text-white focus:ring-2 focus:ring-primary/20 appearance-none"
+                                        value={formData.primaryPmId}
+                                        onChange={(e) => setFormData({ ...formData, primaryPmId: e.target.value })}
+                                    >
+                                        <option value="">Select Primary PM</option>
+                                        {pms.map(pm => (
+                                            <option key={pm._id} value={pm._id}>{pm.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black text-dark-400 uppercase tracking-widest ml-1">Assistant PM</label>
+                                    <select
+                                        className="w-full bg-dark-800 border-none rounded-2xl p-4 text-white focus:ring-2 focus:ring-primary/20 appearance-none"
+                                        value={formData.assistantPmId}
+                                        onChange={(e) => setFormData({ ...formData, assistantPmId: e.target.value })}
+                                    >
+                                        <option value="">No Assistant PM</option>
+                                        {pms.filter(pm => pm._id !== formData.primaryPmId).map(pm => (
+                                            <option key={pm._id} value={pm._id}>{pm.name}</option>
                                         ))}
                                     </select>
                                 </div>

@@ -6,7 +6,8 @@ import {
     Settings,
     HelpCircle,
     MessageSquare,
-    LogOut
+    LogOut,
+    Activity
 } from 'lucide-react';
 import { useContext } from 'react';
 import AuthContext from '../context/AuthContext';
@@ -17,9 +18,13 @@ const Sidebar = () => {
 
     const menuItems = [
         { path: '/', icon: LayoutDashboard, label: 'Overview' },
-        { path: '/projects', icon: Folder, label: 'Projects' }, // We will create this route/view later if needed, or keep everything in dashboard
+        { path: '/projects', icon: Folder, label: 'Projects' },
         { path: '/team', icon: Users, label: 'Team Members' },
     ];
+
+    if (user?.role === 'super_admin') {
+        menuItems.push({ path: '/analytics', icon: Activity, label: 'Analytics' });
+    }
 
     const generalItems = [
         { path: '/messages', icon: MessageSquare, label: 'Messages' },
@@ -38,14 +43,14 @@ const Sidebar = () => {
                 </div>
                 <div>
                     <h3 className="text-white font-semibold text-sm truncate w-32">{user?.name || 'User'}</h3>
-                    <p className="text-dark-500 text-xs capitalize">{user?.role?.replace('_', ' ') || 'Guest'}</p>
+                    <p className="text-dark-400 text-[10px] capitalize">{user?.role?.replace('_', ' ') || 'Guest'}</p>
                 </div>
             </div>
 
             {/* Navigation */}
             <div className="flex-1">
                 <div className="mb-8">
-                    <p className="text-dark-500 text-xs font-bold uppercase mb-4 tracking-wider">Dashboards</p>
+                    <p className="text-dark-400 text-xs font-bold uppercase mb-4 tracking-wider">Dashboards</p>
                     <nav className="space-y-2">
                         {menuItems.map((item) => (
                             <Link
@@ -53,7 +58,7 @@ const Sidebar = () => {
                                 to={item.path}
                                 className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive(item.path)
                                     ? 'bg-primary text-dark-900 shadow-[0_0_15px_rgba(209,243,102,0.3)]'
-                                    : 'text-dark-500 hover:text-white hover:bg-dark-700'
+                                    : 'text-dark-400 hover:text-white hover:bg-dark-700'
                                     }`}
                             >
                                 <item.icon size={20} />
@@ -64,13 +69,13 @@ const Sidebar = () => {
                 </div>
 
                 <div>
-                    <p className="text-dark-500 text-xs font-bold uppercase mb-4 tracking-wider">Settings</p>
+                    <p className="text-dark-400 text-xs font-bold uppercase mb-4 tracking-wider">Settings</p>
                     <nav className="space-y-2">
                         {generalItems.map((item) => (
                             <Link
                                 key={item.path}
                                 to={item.path}
-                                className="flex items-center space-x-3 px-4 py-3 rounded-xl text-dark-500 hover:text-white hover:bg-dark-700 transition-colors"
+                                className="flex items-center space-x-3 px-4 py-3 rounded-xl text-dark-400 hover:text-white hover:bg-dark-700 transition-colors"
                             >
                                 <item.icon size={20} />
                                 <span className="font-medium text-sm">{item.label}</span>
@@ -79,7 +84,7 @@ const Sidebar = () => {
 
                         <button
                             onClick={logout}
-                            className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-dark-500 hover:text-red-400 hover:bg-dark-700 transition-colors mt-4"
+                            className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-dark-400 hover:text-red-400 hover:bg-dark-700 transition-colors mt-4"
                         >
                             <LogOut size={20} />
                             <span className="font-medium text-sm">Logout</span>
@@ -89,7 +94,7 @@ const Sidebar = () => {
             </div>
 
             {/* Bottom Brand */}
-            <div className="mt-6 pt-6 border-t border-dark-600 flex items-center text-dark-500 space-x-2">
+            <div className="mt-6 pt-6 border-t border-dark-600 flex items-center text-dark-400 space-x-2">
                 <div className="w-5 h-5 rounded bg-primary/20 flex items-center justify-center">
                     <div className="w-2 h-2 rounded-full bg-primary"></div>
                 </div>

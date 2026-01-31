@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, Send, Edit2, Trash2, X, Check } from 'lucide-react';
-import axios from 'axios';
+import api from '../../context/api';
 import { toast } from 'react-toastify';
 
 const CommentSection = ({ taskId, projectId, currentUser }) => {
@@ -16,14 +16,11 @@ const CommentSection = ({ taskId, projectId, currentUser }) => {
 
     const fetchComments = async () => {
         try {
-            const token = localStorage.getItem('token');
             const endpoint = taskId
-                ? `/api/comments/task/${taskId}`
-                : `/api/comments/project/${projectId}`;
+                ? `/comments/task/${taskId}`
+                : `/comments/project/${projectId}`;
 
-            const response = await axios.get(endpoint, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const response = await api.get(endpoint);
             setComments(response.data);
         } catch (error) {
             console.error('Error fetching comments:', error);
@@ -36,13 +33,10 @@ const CommentSection = ({ taskId, projectId, currentUser }) => {
 
         setLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            await axios.post('/api/comments', {
+            await api.post('/comments', {
                 taskId: taskId || null,
                 projectId: projectId || null,
                 content: newComment.trim()
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
 
             setNewComment('');
@@ -65,11 +59,8 @@ const CommentSection = ({ taskId, projectId, currentUser }) => {
         if (!editContent.trim()) return;
 
         try {
-            const token = localStorage.getItem('token');
-            await axios.put(`/api/comments/${commentId}`, {
+            await api.put(`/comments/${commentId}`, {
                 content: editContent.trim()
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
 
             setEditingId(null);
@@ -86,10 +77,7 @@ const CommentSection = ({ taskId, projectId, currentUser }) => {
         if (!window.confirm('Are you sure you want to delete this comment?')) return;
 
         try {
-            const token = localStorage.getItem('token');
-            await axios.delete(`/api/comments/${commentId}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.delete(`/comments/${commentId}`);
 
             await fetchComments();
             toast.success('Comment deleted');

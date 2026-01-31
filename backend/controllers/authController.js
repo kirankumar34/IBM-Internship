@@ -132,6 +132,14 @@ const loginUser = asyncHandler(async (req, res) => {
         userAgent: req.get('user-agent')
     });
 
+    // Audit Log
+    const Activity = require('../models/activityModel');
+    await Activity.create({
+        user: user._id,
+        action: 'User Login',
+        details: `${user.name} logged in from ${req.ip || 'unknown IP'}`
+    });
+
     res.json({
         _id: user.id,
         name: user.name,
@@ -244,6 +252,14 @@ const logoutUser = asyncHandler(async (req, res) => {
     if (latestSession) {
         await latestSession.logout(); // Use the model method
     }
+
+    // Audit Log
+    const Activity = require('../models/activityModel');
+    await Activity.create({
+        user: req.user.id,
+        action: 'User Logout',
+        details: `${req.user.name} logged out`
+    });
 
     res.json({ message: 'Logged out successfully' });
 });

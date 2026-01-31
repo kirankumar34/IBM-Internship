@@ -40,6 +40,23 @@ const createTimeLog = asyncHandler(async (req, res) => {
         throw new Error('Cannot log time for future dates');
     }
 
+    // Check if timesheet for this week is already approved
+    const Timesheet = require('../models/timesheetModel');
+    const weekStart = new Date(logDate);
+    weekStart.setDate(logDate.getDate() - logDate.getDay() + 1); // Monday
+    weekStart.setHours(0, 0, 0, 0);
+
+    const existingTimesheet = await Timesheet.findOne({
+        user: req.user.id,
+        weekStartDate: weekStart,
+        status: 'approved'
+    });
+
+    if (existingTimesheet) {
+        res.status(400);
+        throw new Error('Cannot log time to an already approved week');
+    }
+
     const timeLog = await TimeLog.create({
         user: req.user.id,
         task: taskId,

@@ -13,6 +13,7 @@ import Team from './pages/Team';
 import Messages from './pages/Messages';
 import Settings from './pages/Settings';
 import Help from './pages/Help';
+import Analytics from './pages/Analytics';
 import ProjectDetail from './pages/ProjectDetail';
 import PrivateRoute from './components/PrivateRoute';
 
@@ -39,6 +40,7 @@ function App() {
                         <Route path="/team" element={<Layout><Team /></Layout>} />
 
                         <Route path="/messages" element={<Layout><Messages /></Layout>} />
+                        <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
                         <Route path="/settings" element={<Layout><Settings /></Layout>} />
                         <Route path="/help" element={<Layout><Help /></Layout>} />
                     </Route>

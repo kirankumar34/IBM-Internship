@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Target, CheckCircle2, Clock } from 'lucide-react';
-import axios from 'axios';
+import { TrendingUp, Activity, CheckCircle2, Clock } from 'lucide-react';
+import api from '../../context/api';
 
 const ProjectAnalyticsCharts = ({ projectId }) => {
     const [analytics, setAnalytics] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         if (projectId) {
@@ -15,14 +15,13 @@ const ProjectAnalyticsCharts = ({ projectId }) => {
 
     const fetchAnalytics = async () => {
         setLoading(true);
+        setError(null);
         try {
-            const token = localStorage.getItem('token');
-            const response = await axios.get(`/api/analytics/project/${projectId}/progress`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const response = await api.get(`/analytics/project/${projectId}/progress`);
             setAnalytics(response.data);
         } catch (error) {
             console.error('Error fetching analytics:', error);
+            setError('Failed to load analytics data');
         } finally {
             setLoading(false);
         }
@@ -30,33 +29,45 @@ const ProjectAnalyticsCharts = ({ projectId }) => {
 
     if (loading) {
         return (
-            <div className="bg-dark-900 border border-dark-600 rounded-xl p-8 text-center">
-                <p className="text-gray-400">Loading analytics...</p>
+            <div className="bg-dark-800/30 border border-dark-700/50 rounded-[2.5rem] p-12 text-center">
+                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-dark-400 font-bold uppercase tracking-widest text-xs">Calibrating Analytics...</p>
             </div>
         );
     }
 
-    if (!analytics) {
-        return null;
+    if (error) {
+        return (
+            <div className="bg-danger/5 border border-danger/20 rounded-[2.5rem] p-12 text-center">
+                <p className="text-danger font-bold mb-4">{error}</p>
+                <button
+                    onClick={fetchAnalytics}
+                    className="px-6 py-2 bg-dark-800 text-white rounded-xl hover:bg-dark-700 transition border border-dark-600 font-bold text-xs uppercase"
+                >
+                    Retry Connection
+                </button>
+            </div>
+        );
     }
 
-    // Data for charts
-    const milestoneData = Object.keys(analytics.milestones.byStatus).map(status => ({
+    if (!analytics) return null;
+
+    // Data for charts with safeguards
+    const milestoneData = analytics.milestones?.byStatus ? Object.keys(analytics.milestones.byStatus).map(status => ({
         name: status,
         value: analytics.milestones.byStatus[status]
-    }));
+    })) : [];
 
-    const taskData = Object.keys(analytics.tasks.byStatus).map(status => ({
+    const taskData = analytics.tasks?.byStatus ? Object.keys(analytics.tasks.byStatus).map(status => ({
         name: status,
         value: analytics.tasks.byStatus[status]
-    }));
+    })) : [];
 
     const COLORS = {
         'Completed': '#10b981',
         'In Progress': '#3b82f6',
         'Pending': '#f59e0b',
-        'To Do': '#6b7280',
-        'Done': '#10b981'
+        'To Do': '#6b7280'
     };
 
     return (
@@ -76,7 +87,7 @@ const ProjectAnalyticsCharts = ({ projectId }) => {
             <div className="grid grid-cols-4 gap-4">
                 <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 border border-blue-500/30 rounded-xl p-4">
                     <div className="flex items-center gap-3 mb-2">
-                        <Target size={20} className="text-blue-400" />
+                        <Activity size={20} className="text-blue-400" />
                         <p className="text-xs text-blue-400 font-medium">Overall Progress</p>
                     </div>
                     <p className="text-3xl font-bold text-white">{analytics.overallProgress}%</p>
@@ -92,7 +103,7 @@ const ProjectAnalyticsCharts = ({ projectId }) => {
 
                 <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 border border-purple-500/30 rounded-xl p-4">
                     <div className="flex items-center gap-3 mb-2">
-                        <Target size={20} className="text-purple-400" />
+                        <Activity size={20} className="text-purple-400" />
                         <p className="text-xs text-purple-400 font-medium">Milestones</p>
                     </div>
                     <p className="text-3xl font-bold text-white">
@@ -121,10 +132,13 @@ const ProjectAnalyticsCharts = ({ projectId }) => {
                             <YAxis stroke="#9ca3af" />
                             <Tooltip
                                 contentStyle={{
-                                    backgroundColor: '#1f2937',
+                                    backgroundColor: '#111827',
                                     border: '1px solid #374151',
-                                    borderRadius: '8px'
+                                    borderRadius: '12px',
+                                    padding: '12px'
                                 }}
+                                itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
+                                labelStyle={{ color: '#9ca3af', marginBottom: '4px', fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}
                             />
                             <Bar dataKey="value" fill="#8b5cf6" radius={[8, 8, 0, 0]} />
                         </BarChart>
@@ -152,10 +166,17 @@ const ProjectAnalyticsCharts = ({ projectId }) => {
                             </Pie>
                             <Tooltip
                                 contentStyle={{
-                                    backgroundColor: '#1f2937',
+                                    backgroundColor: '#111827',
                                     border: '1px solid #374151',
-                                    borderRadius: '8px'
+                                    borderRadius: '12px',
+                                    padding: '12px'
                                 }}
+                                itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
+                                labelStyle={{ display: 'none' }}
+                            />
+                            <Legend
+                                verticalAlign="bottom"
+                                formatter={(value) => <span className="text-gray-400 text-xs font-bold">{value}</span>}
                             />
                         </PieChart>
                     </ResponsiveContainer>
@@ -176,13 +197,18 @@ const ProjectAnalyticsCharts = ({ projectId }) => {
                                 <YAxis stroke="#9ca3af" label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
                                 <Tooltip
                                     contentStyle={{
-                                        backgroundColor: '#1f2937',
+                                        backgroundColor: '#111827',
                                         border: '1px solid #374151',
-                                        borderRadius: '8px'
+                                        borderRadius: '12px',
+                                        padding: '12px'
                                     }}
+                                    itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
+                                    labelStyle={{ color: '#9ca3af', marginBottom: '4px', fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}
                                     formatter={(value) => [`${value} hours`, 'Effort']}
                                 />
-                                <Legend />
+                                <Legend
+                                    formatter={(value) => <span className="text-gray-400 text-xs font-bold">{value}</span>}
+                                />
                                 <Line
                                     type="monotone"
                                     dataKey="hours"

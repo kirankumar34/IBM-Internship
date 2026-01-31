@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, File, Download, Trash2, FileText, Image as ImageIcon, Archive } from 'lucide-react';
-import axios from 'axios';
+import api from '../../context/api';
 import { toast } from 'react-toastify';
 
 const FileUpload = ({ taskId, projectId, currentUser }) => {
@@ -14,14 +14,11 @@ const FileUpload = ({ taskId, projectId, currentUser }) => {
 
     const fetchFiles = async () => {
         try {
-            const token = localStorage.getItem('token');
             const endpoint = taskId
-                ? `/api/files/task/${taskId}`
-                : `/api/files/project/${projectId}`;
+                ? `/files/task/${taskId}`
+                : `/files/project/${projectId}`;
 
-            const response = await axios.get(endpoint, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const response = await api.get(endpoint);
             setFiles(response.data);
         } catch (error) {
             console.error('Error fetching files:', error);
@@ -45,10 +42,8 @@ const FileUpload = ({ taskId, projectId, currentUser }) => {
         formData.append('projectId', projectId || '');
 
         try {
-            const token = localStorage.getItem('token');
-            await axios.post('/api/files/upload', formData, {
+            await api.post('/files/upload', formData, {
                 headers: {
-                    Authorization: `Bearer ${token}`,
                     'Content-Type': 'multipart/form-data'
                 }
             });
@@ -87,10 +82,7 @@ const FileUpload = ({ taskId, projectId, currentUser }) => {
         if (!window.confirm('Are you sure you want to delete this file?')) return;
 
         try {
-            const token = localStorage.getItem('token');
-            await axios.delete(`/api/files/${fileId}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.delete(`/files/${fileId}`);
 
             toast.success('File deleted');
             await fetchFiles();
@@ -102,9 +94,7 @@ const FileUpload = ({ taskId, projectId, currentUser }) => {
 
     const handleDownload = async (fileId, originalName) => {
         try {
-            const token = localStorage.getItem('token');
-            const response = await axios.get(`/api/files/${fileId}/download`, {
-                headers: { Authorization: `Bearer ${token}` },
+            const response = await api.get(`/files/${fileId}/download`, {
                 responseType: 'blob'
             });
 
@@ -155,8 +145,8 @@ const FileUpload = ({ taskId, projectId, currentUser }) => {
                 onDragOver={handleDrag}
                 onDrop={handleDrop}
                 className={`border-2 border-dashed rounded-lg p-8 text-center transition ${dragActive
-                        ? 'border-blue-500 bg-blue-500/10'
-                        : 'border-dark-600 hover:border-dark-500'
+                    ? 'border-blue-500 bg-blue-500/10'
+                    : 'border-dark-600 hover:border-dark-500'
                     }`}
             >
                 <Upload size={40} className="mx-auto mb-3 text-gray-500" />

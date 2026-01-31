@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, Clock, User, Calendar } from 'lucide-react';
-import axios from 'axios';
+import api from '../../context/api';
 
 const LoginActivityTable = () => {
     const [activities, setActivities] = useState([]);
@@ -19,14 +19,12 @@ const LoginActivityTable = () => {
     const fetchActivity = async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            const params = new URLSearchParams();
-            if (filters.startDate) params.append('startDate', filters.startDate);
-            if (filters.endDate) params.append('endDate', filters.endDate);
-            if (filters.userId) params.append('userId', filters.userId);
-
-            const response = await axios.get(`/api/analytics/login-activity?${params}`, {
-                headers: { Authorization: `Bearer ${token}` }
+            const response = await api.get('/analytics/login-activity', {
+                params: {
+                    startDate: filters.startDate || undefined,
+                    endDate: filters.endDate || undefined,
+                    userId: filters.userId || undefined
+                }
             });
 
             setActivities(response.data.activities);

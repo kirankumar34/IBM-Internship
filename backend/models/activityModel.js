@@ -4,7 +4,7 @@ const activitySchema = mongoose.Schema({
     project: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Project',
-        required: true
+        index: true
     },
     user: {
         type: mongoose.Schema.Types.ObjectId,
