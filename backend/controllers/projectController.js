@@ -6,6 +6,7 @@ const Milestone = require('../models/milestoneModel');
 const Template = require('../models/templateModel');
 const Activity = require('../models/activityModel');
 const User = require('../models/userModel');
+const { calculateProjectProgress } = require('../utils/analyticsHelper');
 
 // @desc    Get all projects (filtered by role and archive status)
 // @route   GET /api/projects
@@ -32,24 +33,13 @@ const getProjects = asyncHandler(async (req, res) => {
         .sort({ createdAt: -1 });
 
     const enrichedProjects = await Promise.all(projects.map(async (p) => {
-        const milestones = await Milestone.find({ project: p._id });
-        const totalMilestones = milestones.length;
-        const completedMilestones = milestones.filter(m => m.status === 'Completed').length;
-
-        const progress = totalMilestones > 0
-            ? Math.round((completedMilestones / totalMilestones) * 100)
-            : 0;
-
-        const taskCount = await Task.countDocuments({ project: p._id });
+        const progress = await calculateProjectProgress(p._id);
         const issueCount = await Issue.countDocuments({ project: p._id, status: 'Open' });
 
         return {
             ...p.toObject(),
             progress,
             stats: {
-                totalMilestones,
-                completedMilestones,
-                totalTasks: taskCount,
                 openIssues: issueCount
             }
         };
@@ -76,9 +66,7 @@ const getProject = asyncHandler(async (req, res) => {
     const milestones = await Milestone.find({ project: project._id }).sort({ dueDate: 1 });
     const activities = await Activity.find({ project: project._id }).populate('user', 'name').sort({ createdAt: -1 }).limit(10);
 
-    const totalMilestones = milestones.length;
-    const completedMilestones = milestones.filter(m => m.status === 'Completed').length;
-    const progress = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0;
+    const progress = await calculateProjectProgress(project._id);
 
     res.status(200).json({
         ...project.toObject(),
@@ -92,16 +80,31 @@ const getProject = asyncHandler(async (req, res) => {
 // @route   POST /api/projects
 // @access  Private (Admin/PM only)
 const createProject = asyncHandler(async (req, res) => {
-    const { name, description, startDate, endDate, members, teamLeads, priority, templateId } = req.body;
+    const { name, description, startDate, endDate, members, teamLeads, priority, templateId, primaryPmId, assistantPmId } = req.body;
 
-    if (!name || !startDate || !endDate) {
+    if (!name || !startDate || !endDate || !primaryPmId) {
         res.status(400);
-        throw new Error('Please provide name, startDate and endDate');
+        throw new Error('Please provide name, startDate, endDate and Primary Project Manager');
     }
 
-    if (new Date(startDate) > new Date(endDate)) {
+    if (new Date(startDate) >= new Date(endDate)) {
         res.status(400);
-        throw new Error('Start date must be before or equal to end date');
+        throw new Error('Start date must be before end date');
+    }
+
+    // Validate PM roles
+    const primaryPm = await User.findById(primaryPmId);
+    if (!primaryPm || primaryPm.role !== 'project_manager') {
+        res.status(400);
+        throw new Error('Selected Primary Project Manager is invalid or does not have PM role');
+    }
+
+    if (assistantPmId) {
+        const assistantPm = await User.findById(assistantPmId);
+        if (!assistantPm || assistantPm.role !== 'project_manager') {
+            res.status(400);
+            throw new Error('Selected Assistant Project Manager is invalid or does not have PM role');
+        }
     }
 
     const project = await Project.create({
@@ -110,7 +113,8 @@ const createProject = asyncHandler(async (req, res) => {
         startDate,
         endDate,
         priority: priority || 'Medium',
-        owner: req.user.id,
+        owner: primaryPmId,
+        assistantPm: assistantPmId || null,
         members: members || [],
         teamLeads: teamLeads || []
     });
@@ -295,6 +299,26 @@ const addMemberToProject = asyncHandler(async (req, res) => {
         throw new Error('Project Admins can only assign Project Managers.');
     }
 
+    // PM Assignment Logic
+    if (callerRole === 'project_manager') {
+        const isProjectOwner = project.owner?.toString() === req.user.id || project.assistantPm?.toString() === req.user.id;
+        if (!isProjectOwner) {
+            res.status(403);
+            throw new Error('You are not authorized to manage this project');
+        }
+
+        // PM can ONLY assign Team Leads
+        if (roleAs !== 'team_leader' || member.role !== 'team_leader') {
+            res.status(403);
+            throw new Error('Project Managers can only assign Team Leaders to the project.');
+        }
+
+        if (project.teamLeads.includes(userId)) {
+            res.status(400);
+            throw new Error('This Team Leader is already assigned to this project');
+        }
+    }
+
     if (callerRole === 'super_admin' && member.role === 'project_manager') {
         // Should have been caught above, but safety fallthrough
     }
@@ -311,7 +335,7 @@ const addMemberToProject = asyncHandler(async (req, res) => {
         project: project._id,
         user: req.user.id,
         action: 'Member Added',
-        details: `${member.name} added as ${roleAs.replace('_', ' ')}.`
+        details: `${member.name} assigned as ${roleAs.replace('_', ' ')}.`
     });
 
     res.status(200).json(project);

@@ -17,6 +17,8 @@ import {
     Pie,
     Cell
 } from 'recharts';
+import LoginActivityTable from '../admin/LoginActivityTable';
+import { Shield } from 'lucide-react';
 
 const DefaultDashboard = () => {
     const { user } = useContext(AuthContext);
@@ -26,24 +28,30 @@ const DefaultDashboard = () => {
         activeTasks: 0,
         pendingTasksTrend: 0
     });
+    const [managers, setManagers] = useState([]);
 
     const [showModal, setShowModal] = useState(false);
     const [newProject, setNewProject] = useState({
-        name: '', description: '', startDate: '', endDate: ''
+        name: '', description: '', startDate: '', endDate: '',
+        primaryPmId: '', assistantPmId: ''
     });
 
     const [chartData, setChartData] = useState([]);
 
     const COLORS = ['#D1F366', '#FFFFFF', '#555555', '#333333'];
 
+    const [globalStats, setGlobalStats] = useState(null);
+
     const fetchData = async () => {
         try {
-            const [projRes, tasksRes] = await Promise.all([
+            const [projRes, tasksRes, analyticsRes] = await Promise.all([
                 api.get('/projects'),
-                api.get('/tasks')
+                api.get('/tasks'),
+                api.get('/analytics/global')
             ]);
 
             setProjects(projRes.data);
+            setGlobalStats(analyticsRes.data);
 
             const tasks = tasksRes.data;
             const total = tasks.length;
@@ -52,28 +60,32 @@ const DefaultDashboard = () => {
             setStats({
                 totalTasks: total,
                 activeTasks: active,
-                pendingTasksTrend: 11 // Mock trend for now
+                pendingTasksTrend: 0 // Removed mock
             });
 
-            // Mock Profit Data (since no backend for finance yet)
-            setChartData([
-                { name: 'Mon', value: 4000 },
-                { name: 'Tue', value: 3000 },
-                { name: 'Wed', value: 2000 },
-                { name: 'Thu', value: 2780 },
-                { name: 'Fri', value: 1890 },
-                { name: 'Sat', value: 2390 },
-                { name: 'Sun', value: 3490 },
-            ]);
+            // Use real chart data if available
+            if (analyticsRes.data.globalWeeklyEffort) {
+                setChartData(analyticsRes.data.globalWeeklyEffort);
+            }
 
         } catch (err) {
             console.error(err);
         }
     };
 
+    const fetchManagers = async () => {
+        try {
+            const res = await api.get('/users');
+            setManagers(res.data.filter(u => u.role === 'project_manager'));
+        } catch (err) {
+            console.error('Failed to fetch managers');
+        }
+    };
+
     useEffect(() => {
         fetchData();
-    }, []);
+        if (user?.role === 'super_admin') fetchManagers();
+    }, [user]);
 
     const handleCreate = async (e) => {
         e.preventDefault();
@@ -82,30 +94,33 @@ const DefaultDashboard = () => {
             toast.success('Project created!');
             setShowModal(false);
             fetchData();
-            setNewProject({ name: '', description: '', startDate: '', endDate: '' });
+            setNewProject({ name: '', description: '', startDate: '', endDate: '', primaryPmId: '', assistantPmId: '' });
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to create project');
         }
     };
 
-    // Strict Rule: No UI creation for projects. System/Seed only.
-    const canCreate = false; // Disable create button globally in dashboard
+    // Re-enabled for Super Admin as per Module 5 requirements
+    const canCreate = user?.role === 'super_admin';
 
     // Metrics Calculation
-    const totalProjects = projects.length;
-    const activeProjects = projects.filter(p => p.status === 'Active' || p.status === 'In Progress').length;
+    const totalProjects = globalStats ? globalStats.totalProjects : projects.length;
+    const activeProjects = globalStats ? globalStats.projectStatus.active : projects.filter(p => p.status === 'Active' || p.status === 'In Progress').length;
 
-    // Calculate overall completion percentage
-    const avgProgress = projects.length > 0
-        ? Math.round(projects.reduce((acc, curr) => acc + (curr.progress || 0), 0) / projects.length)
-        : 0;
+    // Use taskCompletionRate from backend (Standardized)
+    const overallCompletionRate = globalStats ? globalStats.taskCompletionRate : 0;
 
-    // Pie Chart Data
-    const pieData = [
+    // Pie Chart Data from Global Stats
+    const pieData = globalStats ? [
+        { name: 'Completed', value: globalStats.projectStatus.completed },
+        { name: 'Active', value: globalStats.projectStatus.active },
+        { name: 'On Hold', value: globalStats.projectStatus.onHold },
+        { name: 'Planned', value: 0 } // Standardized
+    ] : [
         { name: 'Completed', value: projects.filter(p => p.status === 'Completed').length },
         { name: 'Active', value: projects.filter(p => p.status === 'Active' || p.status === 'In Progress').length },
         { name: 'On Hold', value: projects.filter(p => p.status === 'On Hold').length },
-        { name: 'Planned', value: Math.max(0, totalProjects - activeProjects) } // Just a placeholder logic
+        { name: 'Planned', value: Math.max(0, totalProjects - activeProjects) }
     ];
 
     // If no data, show empty placeholder in pie
@@ -121,11 +136,11 @@ const DefaultDashboard = () => {
                 {[
                     { label: 'Total Projects', value: totalProjects, change: '+0.4%', isPositive: true },
                     { label: 'Active Projects', value: activeProjects, change: '32%', isPositive: true },
-                    { label: 'Completion Rate', value: `${avgProgress}%`, type: 'circle' },
+                    { label: 'Completion Rate', value: `${overallCompletionRate}%`, type: 'circle' },
                     { label: 'Pending Tasks', value: pendingTasks.toLocaleString(), change: '11%', isPositive: true },
                 ].map((item, index) => (
                     <div key={index} className="bg-dark-700 p-6 rounded-2xl border border-dark-600">
-                        <h3 className="text-dark-500 text-sm font-medium mb-4">{item.label}</h3>
+                        <h3 className="text-dark-400 text-sm font-medium mb-4">{item.label}</h3>
                         <div className="flex items-end justify-between">
                             <div>
                                 <div className="text-3xl font-bold text-white mb-1">{item.value}</div>
@@ -149,8 +164,8 @@ const DefaultDashboard = () => {
                 {/* Chart Section */}
                 <div className="lg:col-span-2 bg-dark-700 p-6 rounded-2xl border border-dark-600 relative flex flex-col">
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-white text-lg font-semibold">Project Status</h3>
-                        <button><MoreVertical className="text-dark-500" size={20} /></button>
+                        <h3 className="text-white text-lg font-bold">Project Status</h3>
+                        <button><MoreVertical className="text-dark-400" size={20} /></button>
                     </div>
 
                     <div className="flex flex-col md:flex-row items-center h-full pb-0 md:pb-10 flex-1">
@@ -172,18 +187,18 @@ const DefaultDashboard = () => {
                                 </PieChart>
                             </ResponsiveContainer>
                             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <span className="text-2xl font-bold text-white">{totalProjects}</span>
-                                <span className="text-xs text-dark-500">Total</span>
+                                <span className="text-2xl font-black text-white">{totalProjects}</span>
+                                <span className="text-[10px] text-dark-400 uppercase font-black tracking-widest">Total</span>
                             </div>
                         </div>
-                        <div className="w-full md:w-1/2 space-y-4 px-4">
+                        <div className="w-full md:w-1/2 space-y-4 px-4 overflow-y-auto max-h-[250px] pr-2 custom-scrollbar">
                             {finalPieData.map((d, i) => (
-                                <div key={i} className="flex items-center justify-between">
-                                    <div className="flex items-center text-sm text-dark-500">
-                                        <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>
+                                <div key={i} className="flex items-center justify-between group transition-all duration-300 hover:translate-x-1">
+                                    <div className="flex items-center text-sm text-dark-300 font-bold">
+                                        <div className="w-2.5 h-2.5 rounded-full mr-3 shadow-sm" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>
                                         {d.name}
                                     </div>
-                                    <span className="text-white font-bold">{d.value}</span>
+                                    <span className="text-white font-black">{d.value}</span>
                                 </div>
                             ))}
                         </div>
@@ -200,8 +215,8 @@ const DefaultDashboard = () => {
                         <div className="text-2xl font-bold text-white">12 <span className="text-xs text-primary font-normal">+8%</span></div>
                     </div>
                     <div className="bg-dark-700 p-6 rounded-2xl border border-dark-600 h-[calc(50%-12px)] relative overflow-hidden flex flex-col">
-                        <h3 className="text-dark-500 text-sm">Total Profit</h3>
-                        <div className="text-2xl font-bold text-white mb-4">$136,755.77</div>
+                        <h3 className="text-dark-400 text-xs font-bold uppercase tracking-widest mb-1">Total Effort (Approved)</h3>
+                        <div className="text-2xl font-black text-white mb-4">{globalStats ? globalStats.totalHours : 0} <span className="text-sm text-dark-500 font-normal">hrs</span></div>
                         <div className="flex-1 min-h-[60px]">
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={chartData}>
@@ -238,23 +253,23 @@ const DefaultDashboard = () => {
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
-                                <tr className="text-left text-xs text-dark-500 border-b border-dark-600">
-                                    <th className="pb-3 pl-2">Project Name</th>
-                                    <th className="pb-3">Status</th>
-                                    <th className="pb-3">Owner</th>
-                                    <th className="pb-3 text-right">Deadline</th>
+                                <tr className="text-left text-[10px] text-dark-400 font-black uppercase tracking-widest border-b border-dark-600">
+                                    <th className="pb-4 pl-2 font-black">Project Name</th>
+                                    <th className="pb-4 font-black">Status</th>
+                                    <th className="pb-4 font-black">Owner</th>
+                                    <th className="pb-4 text-right pr-2 font-black">Deadline</th>
                                 </tr>
                             </thead>
                             <tbody className="text-sm">
                                 {projects.map((project, i) => (
                                     <tr key={project._id} className="border-b border-dark-600 last:border-0 hover:bg-dark-800 transition">
                                         <td className="py-4 pl-2 flex items-center space-x-3">
-                                            <div className="w-8 h-8 rounded-full bg-dark-600 flex items-center justify-center text-xs font-bold text-white">
+                                            <div className="w-9 h-9 rounded-full bg-dark-600 flex items-center justify-center text-[10px] font-black text-white shadow-lg border border-dark-500/20">
                                                 {project.name.substring(0, 2).toUpperCase()}
                                             </div>
                                             <div>
-                                                <div className="text-white font-medium">{project.name}</div>
-                                                <div className="text-dark-500 text-xs">{project.description}</div>
+                                                <div className="text-white font-bold">{project.name}</div>
+                                                <div className="text-dark-400 text-[10px] font-medium max-w-[200px] truncate">{project.description}</div>
                                             </div>
                                         </td>
                                         <td className="py-4">
@@ -265,10 +280,10 @@ const DefaultDashboard = () => {
                                                 {project.status}
                                             </span>
                                         </td>
-                                        <td className="py-4 text-dark-500">
-                                            {project.owner?.name || 'Unknown'}
+                                        <td className="py-4 text-dark-300 font-medium">
+                                            {project.owner?.name || 'Unassigned'}
                                         </td>
-                                        <td className="py-4 text-right text-dark-500 font-mono">
+                                        <td className="py-4 text-right pr-2 text-dark-400 font-mono text-xs">
                                             {project.startDate ? new Date(project.startDate).toLocaleDateString() : '-'}
                                         </td>
                                     </tr>
@@ -303,6 +318,22 @@ const DefaultDashboard = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Super Admin: Access Tracking */}
+            {user?.role === 'super_admin' && (
+                <div className="mt-12 animate-in fade-in slide-in-from-bottom-10 duration-700">
+                    <div className="flex items-center space-x-4 mb-8">
+                        <div className="h-12 w-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-lg shadow-primary/5">
+                            <Shield size={24} />
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-black text-white tracking-tight">Access Continuity</h2>
+                            <p className="text-dark-400 text-sm font-medium uppercase tracking-widest bg-dark-800 px-3 py-1 rounded-lg w-fit mt-1">Global Security Overview</p>
+                        </div>
+                    </div>
+                    <LoginActivityTable />
+                </div>
+            )}
 
             {/* Modal */}
             {showModal && (
@@ -345,6 +376,35 @@ const DefaultDashboard = () => {
                                         onChange={e => setNewProject({ ...newProject, endDate: e.target.value })}
                                         required
                                     />
+                                </div>
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-black text-dark-500 uppercase tracking-widest pl-2 mb-1 block">Primary Project Manager</label>
+                                    <select
+                                        className="w-full px-4 py-3 bg-dark-800 border border-dark-600 rounded-xl text-white focus:ring-2 focus:ring-primary focus:outline-none"
+                                        value={newProject.primaryPmId}
+                                        onChange={e => setNewProject({ ...newProject, primaryPmId: e.target.value })}
+                                        required
+                                    >
+                                        <option value="">Select Primary PM</option>
+                                        {managers.map(m => (
+                                            <option key={m._id} value={m._id} disabled={m._id === newProject.assistantPmId}>{m.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-dark-500 uppercase tracking-widest pl-2 mb-1 block">Assistant PM (Optional)</label>
+                                    <select
+                                        className="w-full px-4 py-3 bg-dark-800 border border-dark-600 rounded-xl text-white focus:ring-2 focus:ring-primary focus:outline-none"
+                                        value={newProject.assistantPmId}
+                                        onChange={e => setNewProject({ ...newProject, assistantPmId: e.target.value })}
+                                    >
+                                        <option value="">None</option>
+                                        {managers.map(m => (
+                                            <option key={m._id} value={m._id} disabled={m._id === newProject.primaryPmId}>{m.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
                             <div className="flex justify-end space-x-3 mt-6">

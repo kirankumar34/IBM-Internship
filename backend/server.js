@@ -12,12 +12,20 @@ app.use(express.json());
 app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
+// Serve static files from uploads
+app.use('/uploads', express.static('uploads'));
 
 // Load Models (to ensure schemas are registered)
 require('./models/userModel');
 require('./models/teamModel');
 require('./models/projectModel');
 require('./models/taskModel');
+// Module 5 & 6: New Models
+require('./models/timeLogModel');
+require('./models/timesheetModel');
+require('./models/commentModel');
+require('./models/fileModel');
+require('./models/loginActivityModel');
 
 // Database Connection
 const connectDB = async () => {
@@ -36,6 +44,14 @@ app.use('/api/projects', require('./routes/projectRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/templates', require('./routes/templateRoutes'));
 app.use('/api/tasks', require('./routes/taskRoutes'));
+// Module 5: Time Tracking
+app.use('/api/timelogs', require('./routes/timeLogRoutes'));
+app.use('/api/timesheets', require('./routes/timesheetRoutes'));
+// Module 6: Collaboration
+app.use('/api/comments', require('./routes/commentRoutes'));
+app.use('/api/files', require('./routes/fileRoutes'));
+// Super Admin: Analytics
+app.use('/api/analytics', require('./routes/analyticsRoutes'));
 
 
 

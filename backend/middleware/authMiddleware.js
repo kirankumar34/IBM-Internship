@@ -12,8 +12,14 @@ const protect = asyncHandler(async (req, res, next) => {
         try {
             token = req.headers.authorization.split(' ')[1];
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_do_not_use_in_prod');
+            const user = await User.findById(decoded.id).select('-password');
 
-            req.user = await User.findById(decoded.id).select('-password');
+            if (!user) {
+                res.status(401);
+                throw new Error('User not found, session invalid');
+            }
+
+            req.user = user;
             next();
         } catch (error) {
             console.error(error);
