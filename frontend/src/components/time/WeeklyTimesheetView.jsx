@@ -113,14 +113,26 @@ const WeeklyTimesheetView = ({ userId, isAdminView = false }) => {
                 const logDate = new Date(log.date);
                 const targetDate = new Date(monday);
                 targetDate.setDate(monday.getDate() + dayIndex);
+                // Compare just the date strings to avoid timezone/time issues
                 return logDate.toDateString() === targetDate.toDateString();
             });
         }
 
-        // Use Mock Data if the date matches our Mock Range (Jan 26 - Feb 01)
-        // OR if simply no data is returned, we force show mocks for demo purposes
-        // Filter mock entries by DAY string
-        return MOCK_WEEKLY_DATA.entries.filter(entry => entry.day === dayUpper);
+        // Use Mock Data if backend data is missing/empty
+        // The mock data array is already ordered Mon-Fri (0-4).
+        // If dayIndex corresponds to Sat(5) or Sun(6), we might not have mock data, so safe check.
+        const mockEntry = MOCK_WEEKLY_DATA.entries[dayIndex];
+
+        if (mockEntry) {
+            // Transform the single object into an array of 1 for the map function
+            return [{
+                _id: mockEntry._id,
+                duration: mockEntry.duration,
+                task: mockEntry.task
+            }];
+        }
+
+        return [];
     };
 
     // Calculate display totals (Real or Mock)

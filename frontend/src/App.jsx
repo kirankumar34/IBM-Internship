@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { SocketProvider } from './context/SocketContext';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -10,6 +11,8 @@ import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
 import Team from './pages/Team';
+import Timesheets from './pages/Timesheets';
+import Notifications from './pages/Notifications';
 import Messages from './pages/Messages';
 import Settings from './pages/Settings';
 import Help from './pages/Help';
@@ -22,33 +25,38 @@ import Layout from './components/Layout';
 function App() {
     return (
         <AuthProvider>
-            <Router>
-                <Routes>
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/register" element={<Register />} />
-                    <Route path="/forgot-password" element={<ForgotPassword />} />
-                    <Route path="/reset-password/:token" element={<ResetPassword />} />
+            <SocketProvider>
+                <Router>
+                    <Routes>
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/register" element={<Register />} />
+                        <Route path="/forgot-password" element={<ForgotPassword />} />
+                        <Route path="/reset-password/:token" element={<ResetPassword />} />
 
-                    <Route element={<PrivateRoute />}>
-                        <Route path="/" element={
-                            <Layout>
-                                <Dashboard />
-                            </Layout>
-                        } />
-                        <Route path="/projects" element={<Layout><Projects /></Layout>} />
-                        <Route path="/projects/:id" element={<Layout><ProjectDetail /></Layout>} />
-                        <Route path="/team" element={<Layout><Team /></Layout>} />
+                        <Route element={<PrivateRoute />}>
+                            <Route path="/" element={
+                                <Layout>
+                                    <Dashboard />
+                                </Layout>
+                            } />
+                            <Route path="/projects" element={<Layout><Projects /></Layout>} />
+                            <Route path="/projects/:id" element={<Layout><ProjectDetail /></Layout>} />
+                            <Route path="/team" element={<Layout><Team /></Layout>} />
+                            <Route path="/timesheets" element={<Layout><Timesheets /></Layout>} />
+                            <Route path="/notifications" element={<Layout><Notifications /></Layout>} />
 
-                        <Route path="/messages" element={<Layout><Messages /></Layout>} />
-                        <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
-                        <Route path="/settings" element={<Layout><Settings /></Layout>} />
-                        <Route path="/help" element={<Layout><Help /></Layout>} />
-                    </Route>
-                </Routes>
-            </Router>
-            <ToastContainer position="bottom-right" theme="dark" />
+                            <Route path="/messages" element={<Layout><Messages /></Layout>} />
+                            <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
+                            <Route path="/settings" element={<Layout><Settings /></Layout>} />
+                            <Route path="/help" element={<Layout><Help /></Layout>} />
+                        </Route>
+                    </Routes>
+                </Router>
+                <ToastContainer position="bottom-right" theme="dark" />
+            </SocketProvider>
         </AuthProvider>
     );
 }
 
 export default App;
+

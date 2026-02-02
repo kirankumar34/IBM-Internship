@@ -7,7 +7,8 @@ import {
     HelpCircle,
     MessageSquare,
     LogOut,
-    Activity
+    Activity,
+    Clock
 } from 'lucide-react';
 import { useContext } from 'react';
 import AuthContext from '../context/AuthContext';
@@ -20,9 +21,10 @@ const Sidebar = () => {
         { path: '/', icon: LayoutDashboard, label: 'Overview' },
         { path: '/projects', icon: Folder, label: 'Projects' },
         { path: '/team', icon: Users, label: 'Team Members' },
+        { path: '/timesheets', icon: Clock, label: 'Timesheets' },
     ];
 
-    if (user?.role === 'super_admin') {
+    if (['super_admin', 'project_admin', 'project_manager', 'team_leader'].includes(user?.role)) {
         menuItems.push({ path: '/analytics', icon: Activity, label: 'Analytics' });
     }
 

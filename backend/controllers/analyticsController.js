@@ -71,7 +71,8 @@ const getGlobalStats = asyncHandler(async (req, res) => {
         totalUsers: await User.countDocuments(role === 'super_admin' ? {} : { organizationId: req.user.organizationId }),
         totalTasks,
         totalHours,
-        taskCompletionRate,
+        taskCompletionRate, // Used by dashboard
+        avgCompletionRate: taskCompletionRate, // Legacy alias
         globalWeeklyEffort, // Added for dashboard chart
         projectStatus: {
             active: projects.filter(p => p.status === 'Active').length,

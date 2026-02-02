@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Square, Clock } from 'lucide-react';
-import axios from 'axios';
+import api from '../../context/api';
 import { toast } from 'react-toastify';
 
 const TimerWidget = ({ taskId, taskTitle, onTimeLogged }) => {
     const [isRunning, setIsRunning] = useState(false);
     const [startTime, setStartTime] = useState(null);
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        // Check for active timer on mount
+        checkActiveTimer();
+    }, [taskId]);
 
     useEffect(() => {
         let interval = null;
@@ -24,6 +30,24 @@ const TimerWidget = ({ taskId, taskTitle, onTimeLogged }) => {
         };
     }, [isRunning, startTime]);
 
+    const checkActiveTimer = async () => {
+        try {
+            const res = await api.get('/timer/active');
+            if (res.data && res.data.task?._id === taskId) {
+                setIsRunning(true);
+                setStartTime(new Date(res.data.startTime));
+                const now = new Date();
+                setElapsedSeconds(Math.floor((now - new Date(res.data.startTime)) / 1000));
+            } else {
+                setIsRunning(false);
+                setStartTime(null);
+                setElapsedSeconds(0);
+            }
+        } catch (error) {
+            console.error('Error checking active timer:', error);
+        }
+    };
+
     const formatTime = (seconds) => {
         const hrs = Math.floor(seconds / 3600);
         const mins = Math.floor((seconds % 3600) / 60);
@@ -31,40 +55,29 @@ const TimerWidget = ({ taskId, taskTitle, onTimeLogged }) => {
         return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const handleStart = () => {
-        const now = new Date();
-        setStartTime(now);
-        setIsRunning(true);
-        setElapsedSeconds(0);
-        toast.info('Timer started');
+    const handleStart = async () => {
+        try {
+            setLoading(true);
+            const res = await api.post('/timer/start', { taskId });
+            setStartTime(new Date(res.data.startTime));
+            setIsRunning(true);
+            setElapsedSeconds(0);
+            toast.info('Timer started');
+        } catch (error) {
+            console.error('Error starting timer:', error);
+            toast.error(error.response?.data?.message || 'Failed to start timer');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleStop = async () => {
-        if (!startTime) return;
-
-        const endTime = new Date();
-        const duration = (endTime - startTime) / (1000 * 60 * 60); // hours
-
-        if (duration < 0.01) { // Less than ~30 seconds
-            toast.error('Timer duration too short (minimum 1 minute)');
-            setIsRunning(false);
-            setStartTime(null);
-            setElapsedSeconds(0);
-            return;
-        }
+        if (!isRunning) return;
 
         try {
-            const token = localStorage.getItem('token');
-            await axios.post('/api/timelogs', {
-                taskId,
-                date: startTime.toISOString().split('T')[0],
-                startTime: startTime.toISOString(),
-                endTime: endTime.toISOString(),
-                description: 'Timer-based entry',
-                isManual: false
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            setLoading(true);
+            const res = await api.post('/timer/stop');
+            const duration = res.data.duration?.hours || 0;
 
             toast.success(`Time logged: ${duration.toFixed(2)} hours`);
 
@@ -74,8 +87,10 @@ const TimerWidget = ({ taskId, taskTitle, onTimeLogged }) => {
 
             if (onTimeLogged) onTimeLogged();
         } catch (error) {
-            console.error('Error logging time:', error);
-            toast.error(error.response?.data?.message || 'Failed to log time');
+            console.error('Error stopping timer:', error);
+            toast.error(error.response?.data?.message || 'Failed to stop timer');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -90,21 +105,23 @@ const TimerWidget = ({ taskId, taskTitle, onTimeLogged }) => {
                     </span>
                     <button
                         onClick={handleStop}
-                        className="flex items-center gap-1.5 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs font-medium transition"
+                        disabled={loading}
+                        className="flex items-center gap-1.5 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs font-medium transition disabled:opacity-50"
                         title="Stop timer and save"
                     >
                         <Square size={12} />
-                        Stop
+                        {loading ? 'Saving...' : 'Stop'}
                     </button>
                 </>
             ) : (
                 <button
                     onClick={handleStart}
-                    className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-medium transition"
+                    disabled={loading}
+                    className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-medium transition disabled:opacity-50"
                     title="Start timer"
                 >
                     <Play size={12} />
-                    Start Timer
+                    {loading ? 'Starting...' : 'Start Timer'}
                 </button>
             )}
         </div>

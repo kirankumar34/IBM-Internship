@@ -155,6 +155,18 @@ const approveTimesheet = asyncHandler(async (req, res) => {
         details: `Weekly timesheet (Start: ${timesheet.weekStartDate.toLocaleDateString()}) for ${timesheet.user.name} was approved.`
     });
 
+    // Create notification for user
+    const { createNotification } = require('../services/notificationService');
+    await createNotification({
+        recipient: timesheet.user._id,
+        sender: req.user.id,
+        type: 'timesheet_approved',
+        title: 'Timesheet Approved',
+        message: `Your timesheet for week of ${timesheet.weekStartDate.toLocaleDateString()} has been approved.`,
+        refModel: 'Timesheet',
+        refId: timesheet._id
+    });
+
     res.json(timesheet);
 });
 
@@ -193,6 +205,18 @@ const rejectTimesheet = asyncHandler(async (req, res) => {
         user: req.user.id,
         action: 'Timesheet Rejected',
         details: `Weekly timesheet (Start: ${timesheet.weekStartDate.toLocaleDateString()}) for ${timesheet.user.name} was rejected. Reason: ${timesheet.rejectionReason}`
+    });
+
+    // Create notification for user
+    const { createNotification } = require('../services/notificationService');
+    await createNotification({
+        recipient: timesheet.user._id,
+        sender: req.user.id,
+        type: 'timesheet_rejected',
+        title: 'Timesheet Rejected',
+        message: `Your timesheet was rejected: ${timesheet.rejectionReason}`,
+        refModel: 'Timesheet',
+        refId: timesheet._id
     });
 
     res.json(timesheet);

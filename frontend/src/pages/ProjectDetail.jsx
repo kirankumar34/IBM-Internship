@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import TaskBoard from '../components/TaskBoard';
 import CommentSection from '../components/collaboration/CommentSection';
 import FileUpload from '../components/collaboration/FileUpload';
+import DiscussionBoard from '../components/collaboration/DiscussionBoard';
 import ProjectAnalyticsCharts from '../components/admin/ProjectAnalyticsCharts';
 import WeeklyTimesheetView from '../components/time/WeeklyTimesheetView';
 import EmployeeActivityView from '../components/admin/EmployeeActivityView';
@@ -592,6 +593,10 @@ const ProjectDetail = () => {
 
                 {activeTab === 'collaboration' && (
                     <div className="lg:col-span-3 space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-500">
+                        {/* Discussion Board */}
+                        <DiscussionBoard projectId={project._id} />
+
+                        {/* Comments and Files */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             <CommentSection projectId={project._id} />
                             <FileUpload projectId={project._id} />

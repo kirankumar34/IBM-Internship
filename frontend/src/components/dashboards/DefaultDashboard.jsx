@@ -108,7 +108,7 @@ const DefaultDashboard = () => {
     const activeProjects = globalStats ? globalStats.projectStatus.active : projects.filter(p => p.status === 'Active' || p.status === 'In Progress').length;
 
     // Use taskCompletionRate from backend (Standardized)
-    const overallCompletionRate = globalStats ? globalStats.taskCompletionRate : 0;
+    const overallCompletionRate = globalStats?.taskCompletionRate ?? globalStats?.avgCompletionRate ?? 0;
 
     // Pie Chart Data from Global Stats
     const pieData = globalStats ? [
