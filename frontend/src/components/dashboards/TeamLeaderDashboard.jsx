@@ -96,15 +96,32 @@ const TeamLeaderDashboard = () => {
                         <input className="w-full bg-dark-800 border-none rounded-2xl py-4 px-6 text-white" placeholder="Task Title" onChange={e => setNewTask({ ...newTask, title: e.target.value })} required />
 
                         <label className="text-xs text-dark-500 font-bold ml-2">Select Project</label>
-                        <select className="w-full bg-dark-800 border-none rounded-2xl p-4 text-white" onChange={e => setNewTask({ ...newTask, project: e.target.value })} required>
+                        <select
+                            className="w-full bg-dark-800 border-none rounded-2xl p-4 text-white"
+                            onChange={e => {
+                                setNewTask({ ...newTask, project: e.target.value, assignedTo: '' }); // Reset assignee
+                            }}
+                            required
+                        >
                             <option value="">Choose Project</option>
                             {projects.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
                         </select>
 
                         <label className="text-xs text-dark-500 font-bold ml-2">Assign to Member</label>
-                        <select className="w-full bg-dark-800 border-none rounded-2xl p-4 text-white" onChange={e => setNewTask({ ...newTask, assignedTo: e.target.value })} required>
-                            <option value="">Choose Member</option>
-                            {team.map(m => <option key={m._id} value={m._id}>{m.name}</option>)}
+                        <select
+                            className="w-full bg-dark-800 border-none rounded-2xl p-4 text-white"
+                            onChange={e => setNewTask({ ...newTask, assignedTo: e.target.value })}
+                            required
+                            disabled={!newTask.project}
+                        >
+                            <option value="">{newTask.project ? "Choose Member" : "Select Project First"}</option>
+                            {/* Dynamically filter members based on selected project */}
+                            {newTask.project && projects.find(p => p._id === newTask.project)?.members
+                                .filter(m => m.role === 'team_member') // STRICT FILTER: Only Team Members
+                                .map(m => (
+                                    <option key={m._id} value={m._id}>{m.name}</option>
+                                ))
+                            }
                         </select>
 
                         <div className="flex justify-end space-x-4 pt-4">

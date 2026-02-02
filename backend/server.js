@@ -1,11 +1,17 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const { initSocket } = require('./config/socket');
 
 const app = express();
+const server = http.createServer(app);
+
+// Initialize Socket.io
+const io = initSocket(server);
 
 // Middleware
 app.use(express.json());
@@ -14,6 +20,12 @@ app.use(helmet());
 app.use(morgan('dev'));
 // Serve static files from uploads
 app.use('/uploads', express.static('uploads'));
+
+// Make io accessible to routes
+app.use((req, res, next) => {
+    req.io = io;
+    next();
+});
 
 // Load Models (to ensure schemas are registered)
 require('./models/userModel');
@@ -26,6 +38,9 @@ require('./models/timesheetModel');
 require('./models/commentModel');
 require('./models/fileModel');
 require('./models/loginActivityModel');
+require('./models/discussionModel');
+require('./models/notificationModel');
+require('./models/timerSessionModel');
 
 // Database Connection
 const connectDB = async () => {
@@ -52,6 +67,12 @@ app.use('/api/comments', require('./routes/commentRoutes'));
 app.use('/api/files', require('./routes/fileRoutes'));
 // Super Admin: Analytics
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
+// Module 6.2: Discussions
+app.use('/api/discussions', require('./routes/discussionRoutes'));
+// Module 7: Notifications
+app.use('/api/notifications', require('./routes/notificationRoutes'));
+// Module 5: Timer
+app.use('/api/timer', require('./routes/timerRoutes'));
 
 
 
@@ -73,7 +94,9 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 connectDB().then(() => {
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
         console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+        console.log('Socket.io initialized for real-time notifications');
     });
 });
+

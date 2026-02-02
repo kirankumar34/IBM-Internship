@@ -1,5 +1,7 @@
 import Sidebar from './Sidebar';
-import { Search, Bell, Moon } from 'lucide-react';
+import { Search, Moon } from 'lucide-react';
+import NotificationBell from './notifications/NotificationBell';
+import GlobalTimer from './time/GlobalTimer';
 
 const Layout = ({ children }) => {
     return (
@@ -38,12 +40,7 @@ const Layout = ({ children }) => {
                             <Moon size={20} />
                         </button>
 
-                        <div className="relative">
-                            <button className="text-white hover:text-primary transition">
-                                <Bell size={20} />
-                            </button>
-                            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 border border-dark-900"></span>
-                        </div>
+                        <NotificationBell />
                     </div>
                 </header>
 
@@ -52,8 +49,12 @@ const Layout = ({ children }) => {
                     {children}
                 </main>
             </div>
+
+            {/* Global Timer Widget */}
+            <GlobalTimer />
         </div>
     );
 };
 
 export default Layout;
+

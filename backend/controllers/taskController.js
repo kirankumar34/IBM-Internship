@@ -88,16 +88,23 @@ const createTask = asyncHandler(async (req, res) => {
                 throw new Error('Project Managers can only assign tasks to Team Leaders');
             }
         } else if (req.user.role === 'team_leader') {
-            // TL can only assign to their Team Members
-            // Check if assignee reports to this TL or is in same team
-            const isTeamMember = assignee.reportsTo?.toString() === req.user.id.toString() ||
-                (assignee.teamId && assignee.teamId.toString() === req.user.teamId?.toString());
+            // STRICT VALIDATION:
+            // 1. Assignee must be in project.members
+            const isProjectMember = project.members.some(m => m.toString() === assignedTo.toString());
 
-            if (!isTeamMember) {
+            if (!isProjectMember) {
                 res.status(403);
                 await task.deleteOne(); // Rollback
-                throw new Error('Team Leaders can only assign tasks to their own team members');
+                throw new Error('Selected user is not a member of this project');
             }
+
+            // 2. Assignee must be a TEAM_MEMBER (Block Clients, PMs, etc.)
+            if (assignee.role !== 'team_member') {
+                res.status(403);
+                await task.deleteOne(); // Rollback
+                throw new Error('Tasks can only be assigned to Team Members');
+            }
+
         }
     }
 
