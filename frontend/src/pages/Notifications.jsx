@@ -24,10 +24,13 @@ const Notifications = () => {
             if (filter === 'unread') params.append('unreadOnly', 'true');
 
             const res = await api.get(`/notifications?${params}`);
-            setNotifications(res.data.notifications);
-            setTotalPages(res.data.pages);
+            // Safe guard for notifications array
+            const list = res?.data?.notifications || res?.data || [];
+            setNotifications(Array.isArray(list) ? list : []);
+            setTotalPages(res?.data?.pages || 1);
         } catch (error) {
             console.error('Error fetching notifications:', error);
+            setNotifications([]);
         } finally {
             setLoading(false);
         }
