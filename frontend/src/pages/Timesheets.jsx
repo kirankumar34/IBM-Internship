@@ -12,21 +12,34 @@ const Timesheets = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [activeTab, setActiveTab] = useState('my');
+    const [processingId, setProcessingId] = useState(null);
     const [localEntries, setLocalEntries] = useState({}); // { `${taskId}-${dayIndex}`: duration }
+    const loadingRef = React.useRef(false);
 
-    useEffect(() => {
-        if (user && user.id) {
-            loadData();
+    const loadData = React.useCallback(async () => {
+        const userId = user?._id || user?.id;
+        if (!userId) {
+            setLoading(false);
+            return;
         }
-    }, [currentWeek, user]);
 
-    const loadData = async () => {
+        if (loadingRef.current) return;
+        loadingRef.current = true;
+
         setLoading(true);
+
+        // HARD TIMEOUT SAFETY: Force exit loading after 2.5 seconds
+        const timeout = setTimeout(() => {
+            setLoading(false);
+            loadingRef.current = false;
+        }, 2500);
+
         try {
+            const reqUserId = user?._id || user?.id;
             // Parallel fetch
             const promises = [
-                api.get(`/timesheets/user/${user.id}/week/${currentWeek}`),
-                api.get('/tasks') // Fetch all tasks, filter in FE or use specialized endpoint
+                api.get(`/timesheets/user/${reqUserId}/week/${currentWeek}`),
+                api.get('/tasks')
             ];
 
             if (['super_admin', 'project_manager', 'team_leader'].includes(user.role)) {
@@ -37,41 +50,55 @@ const Timesheets = () => {
 
             // Timesheet
             if (results[0].status === 'fulfilled') {
-                const ts = results[0].value.data;
-                setTimesheet(ts);
-
-                // Initialize local state from existing entries
-                const entriesMap = {};
-                ts.entries.forEach(entry => {
-                    const date = new Date(entry.date);
-                    const dayIndex = (date.getDay() + 6) % 7; // Mon=0, Sun=6
-                    const taskId = entry.task?._id || entry.task;
-                    entriesMap[`${taskId}-${dayIndex}`] = entry.duration;
-                });
-                setLocalEntries(entriesMap);
+                const ts = results[0].value?.data;
+                setTimesheet(ts || null);
+                if (ts) {
+                    const entriesMap = {};
+                    const entries = Array.isArray(ts?.entries) ? ts.entries : [];
+                    entries.forEach(entry => {
+                        if (!entry) return;
+                        const date = new Date(entry.date);
+                        const dayIndex = (date.getDay() + 6) % 7;
+                        const taskId = entry.task?._id || entry.task;
+                        if (taskId) entriesMap[`${taskId}-${dayIndex}`] = entry.duration;
+                    });
+                    setLocalEntries(entriesMap);
+                }
+            } else {
+                console.error('Timesheet fetch failed:', results[0].reason);
+                setTimesheet(null);
             }
 
             // Tasks
             if (results[1].status === 'fulfilled') {
-                // Filter tasks assigned to user AND active
-                const allTasks = results[1].value.data;
+                const allTasks = Array.isArray(results[1].value?.data) ? results[1].value.data : [];
                 const myTasks = allTasks.filter(t =>
-                    t.assignedTo?._id === user.id || t.assignedTo === user.id
+                    t && (t.assignedTo?._id === reqUserId || t.assignedTo === reqUserId)
                 );
                 setAssignedTasks(myTasks);
+            } else {
+                setAssignedTasks([]);
             }
 
             // Pending
             if (results[2] && results[2].status === 'fulfilled') {
-                setPendingTimesheets(results[2].value.data);
+                setPendingTimesheets(Array.isArray(results[2].value?.data) ? results[2].value.data : []);
+            } else {
+                setPendingTimesheets([]);
             }
 
         } catch (error) {
             console.error('Data Load Error', error);
         } finally {
             setLoading(false);
+            clearTimeout(timeout);
+            loadingRef.current = false;
         }
-    };
+    }, [currentWeek, user?._id, user?.id, user?.role]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     function getWeekId(date) {
         const d = new Date(date);
@@ -121,7 +148,8 @@ const Timesheets = () => {
             });
             // Background refresh to get totals correct
             // Or manually update totals locally to avoid flicker
-            const res = await api.get(`/timesheets/user/${user.id}/week/${currentWeek}`);
+            const userId = user?._id || user?.id;
+            const res = await api.get(`/timesheets/user/${userId}/week/${currentWeek}`);
             setTimesheet(res.data);
         } catch (err) {
             console.error('Save failed', err);
@@ -150,17 +178,16 @@ const Timesheets = () => {
         // Add assigned tasks
         assignedTasks.forEach(t => taskMap.set(t._id, t));
 
-        // Add tasks from timesheet entries (if not already there)
-        if (timesheet?.entries) {
-            timesheet.entries.forEach(e => {
-                if (e.task) {
-                    const taskId = e.task._id || e.task;
-                    if (!taskMap.has(taskId)) {
-                        taskMap.set(taskId, { _id: taskId, title: e.task.title || 'Unknown Task', project: e.task.project });
-                    }
+        // Add tasks from timesheet entries (if not already there) - safe guard
+        const timesheetEntries = Array.isArray(timesheet?.entries) ? timesheet.entries : [];
+        timesheetEntries.forEach(e => {
+            if (e && e.task) {
+                const taskId = e.task._id || e.task;
+                if (!taskMap.has(taskId)) {
+                    taskMap.set(taskId, { _id: taskId, title: e.task.title || 'Unknown Task', project: e.task.project });
                 }
-            });
-        }
+            }
+        });
         return Array.from(taskMap.values());
     };
 
@@ -180,20 +207,26 @@ const Timesheets = () => {
 
     // ... handleApprove, handleReject same as before ... 
     const handleApprove = async (id) => {
+        setProcessingId(id);
         try {
             await api.put(`/timesheets/${id}/approve`);
-            loadData(); // Reload all
+            await loadData(); // Reload all
         } catch (error) {
             console.error('Error approving timesheet:', error);
+        } finally {
+            setProcessingId(null);
         }
     };
 
     const handleReject = async (id, reason) => {
+        setProcessingId(id);
         try {
             await api.put(`/timesheets/${id}/reject`, { reason: reason || 'Rejected by manager' });
-            loadData();
+            await loadData();
         } catch (error) {
             console.error('Error rejecting timesheet:', error);
+        } finally {
+            setProcessingId(null);
         }
     };
 
@@ -229,16 +262,18 @@ const Timesheets = () => {
     const { weekStart, weekEnd } = getWeekDates(currentWeek);
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-    if (loading && !timesheet) {
-        return (
-            <div className="flex items-center justify-center h-[60vh]">
-                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-            </div>
-        );
-    }
-
     return (
         <div className="space-y-8 animate-in fade-in">
+            {/* Loading Indicator (Subtle) */}
+            {loading && (
+                <div className="fixed top-24 right-8 z-50">
+                    <div className="flex items-center gap-2 bg-dark-800 border border-dark-700 px-4 py-2 rounded-full shadow-2xl">
+                        <RefreshCw size={14} className="text-primary animate-spin" />
+                        <span className="text-[10px] text-white font-bold uppercase tracking-widest">Updating...</span>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
@@ -437,17 +472,19 @@ const Timesheets = () => {
                                                     <>
                                                         <button
                                                             onClick={() => handleApprove(ts._id)}
-                                                            className="p-3 bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white rounded-xl transition border border-green-500/20"
+                                                            disabled={processingId === ts._id}
+                                                            className={`p-3 bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white rounded-xl transition border border-green-500/20 ${processingId === ts._id ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                             title="Approve"
                                                         >
-                                                            <CheckCircle size={22} />
+                                                            {processingId === ts._id ? <RefreshCw size={22} className="animate-spin" /> : <CheckCircle size={22} />}
                                                         </button>
                                                         <button
                                                             onClick={() => {
                                                                 const reason = window.prompt("Rejection Reason (Required):");
                                                                 if (reason) handleReject(ts._id, reason);
                                                             }}
-                                                            className="p-3 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition border border-red-500/20"
+                                                            disabled={processingId === ts._id}
+                                                            className={`p-3 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition border border-red-500/20 ${processingId === ts._id ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                             title="Reject"
                                                         >
                                                             <XCircle size={22} />

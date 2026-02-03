@@ -64,7 +64,7 @@ const TimesheetAnalytics = ({ projectId }) => {
                 </div>
                 <div className="text-right">
                     <p className="text-[10px] text-dark-500 font-black uppercase tracking-widest mb-1">Cumulative Project Hours</p>
-                    <p className="text-4xl font-black text-white">{data.totalProjectHours}<span className="text-lg text-dark-500 ml-1">HRS</span></p>
+                    <p className="text-4xl font-black text-white">{data.totalProjectHours ?? 0}<span className="text-lg text-dark-500 ml-1">HRS</span></p>
                 </div>
             </div>
 
@@ -79,16 +79,16 @@ const TimesheetAnalytics = ({ projectId }) => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-dark-800/50">
-                        {data.timesheets.map((ts) => (
-                            <tr key={ts.user._id} className="hover:bg-dark-700/30 transition group">
+                        {(Array.isArray(data.timesheets) ? data.timesheets : []).map((ts) => (
+                            <tr key={ts.user?._id || Math.random()} className="hover:bg-dark-700/30 transition group">
                                 <td className="px-8 py-6">
                                     <div className="flex items-center space-x-4">
                                         <div className="h-10 w-10 bg-dark-700 rounded-xl flex items-center justify-center text-white font-bold border border-dark-600">
-                                            {ts.user.name.charAt(0)}
+                                            {ts.user?.name?.charAt(0) || 'U'}
                                         </div>
                                         <div>
-                                            <p className="text-sm font-black text-white">{ts.user.name}</p>
-                                            <p className="text-[10px] text-dark-500 font-bold">{ts.user.role.replace('_', ' ')}</p>
+                                            <p className="text-sm font-black text-white">{ts.user?.name || 'Unknown'}</p>
+                                            <p className="text-[10px] text-dark-500 font-bold">{(ts.user?.role || 'user').replace('_', ' ')}</p>
                                         </div>
                                     </div>
                                 </td>
@@ -99,10 +99,10 @@ const TimesheetAnalytics = ({ projectId }) => {
                                     </div>
                                 </td>
                                 <td className="px-8 py-6">
-                                    {ts.entries.length > 0 ? (
+                                    {Array.isArray(ts.entries) && ts.entries.length > 0 ? (
                                         <div>
-                                            <p className="text-sm text-dark-300 font-medium truncate max-w-[200px]">{ts.entries[0].task?.title || 'External'}</p>
-                                            <p className="text-[10px] text-dark-500">{new Date(ts.entries[0].date).toLocaleDateString()}</p>
+                                            <p className="text-sm text-dark-300 font-medium truncate max-w-[200px]">{ts.entries[0]?.task?.title || 'External'}</p>
+                                            <p className="text-[10px] text-dark-500">{ts.entries[0]?.date ? new Date(ts.entries[0].date).toLocaleDateString() : '-'}</p>
                                         </div>
                                     ) : (
                                         <span className="text-xs text-dark-600">No entries</span>
@@ -113,11 +113,11 @@ const TimesheetAnalytics = ({ projectId }) => {
                                         <div className="w-24 bg-dark-900 rounded-full h-1.5 mr-3 overflow-hidden">
                                             <div
                                                 className="bg-primary h-full shadow-[0_0_8px_rgba(var(--primary-rgb),0.5)]"
-                                                style={{ width: `${Math.min((ts.totalHours / 40) * 100, 100)}%` }}
+                                                style={{ width: `${Math.min(((ts.totalHours || 0) / 40) * 100, 100)}%` }}
                                             ></div>
                                         </div>
                                         <span className="text-[10px] font-black text-white">
-                                            {ts.totalHours > 30 ? 'High' : ts.totalHours > 15 ? 'Ideal' : 'Low'}
+                                            {(ts.totalHours || 0) > 30 ? 'High' : (ts.totalHours || 0) > 15 ? 'Ideal' : 'Low'}
                                         </span>
                                     </div>
                                 </td>
@@ -125,7 +125,7 @@ const TimesheetAnalytics = ({ projectId }) => {
                         ))}
                     </tbody>
                 </table>
-                {data.timesheets.length === 0 && (
+                {(!Array.isArray(data.timesheets) || data.timesheets.length === 0) && (
                     <div className="py-20 text-center">
                         <Calendar size={48} className="mx-auto text-dark-600 mb-4 opacity-20" />
                         <p className="text-dark-500 font-bold uppercase tracking-widest text-xs">No timesheet records found for this project.</p>

@@ -9,6 +9,38 @@ const { createNotification } = require('../services/notificationService');
 
 router.use(protect);
 
+// Helper function to convert week ID to date range
+function getWeekDates(weekId) {
+    const [year, week] = weekId.split('-W').map(Number);
+    const simple = new Date(year, 0, 1 + (week - 1) * 7);
+    const dow = simple.getDay();
+    const weekStart = new Date(simple);
+    weekStart.setDate(simple.getDate() - dow + (dow === 0 ? -6 : 1));
+    weekStart.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+    return { weekStart, weekEnd };
+}
+
+// Helper function to get week start from a date object
+function getWeekStart(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const weekStart = new Date(d.setDate(diff));
+    weekStart.setHours(0, 0, 0, 0);
+    return weekStart;
+}
+
+// Helper function to get week end from week start
+function getWeekEnd(weekStart) {
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+    return weekEnd;
+}
+
 // @desc    Get or create weekly timesheet
 // @route   GET /api/timesheets/user/:userId/week/:weekId
 // @access  Private (self or manager)

@@ -247,10 +247,64 @@ const getProjectPDF = asyncHandler(async (req, res) => {
     doc.end();
 });
 
+// @desc    Get project timesheet analytics
+// @route   GET /api/analytics/project/:projectId/timesheets
+const getProjectTimesheets = asyncHandler(async (req, res) => {
+    const { projectId } = req.params;
+    const project = await Project.findById(projectId);
+
+    if (!project) {
+        res.status(404);
+        throw new Error('Project not found');
+    }
+
+    // Get all time logs for this project
+    const timeLogs = await TimeLog.find({ project: projectId })
+        .populate('user', 'name role')
+        .populate('task', 'title')
+        .sort({ date: -1 });
+
+    // Group by user
+    const userMap = {};
+    timeLogs.forEach(log => {
+        if (!log.user) return;
+        const userId = log.user._id.toString();
+        if (!userMap[userId]) {
+            userMap[userId] = {
+                user: {
+                    _id: log.user._id,
+                    name: log.user.name,
+                    role: log.user.role
+                },
+                totalHours: 0,
+                entries: []
+            };
+        }
+        userMap[userId].totalHours += log.duration || 0;
+        if (userMap[userId].entries.length < 5) {
+            userMap[userId].entries.push({
+                task: log.task,
+                date: log.date,
+                duration: log.duration
+            });
+        }
+    });
+
+    const timesheets = Object.values(userMap).sort((a, b) => b.totalHours - a.totalHours);
+    const totalProjectHours = Math.round(timeLogs.reduce((sum, log) => sum + (log.duration || 0), 0) * 10) / 10;
+
+    res.json({
+        project: { id: project._id, name: project.name },
+        timesheets,
+        totalProjectHours
+    });
+});
+
 module.exports = {
     getGlobalStats,
     getProjectProgress,
     getProjectActivity,
     getLoginActivity,
-    getProjectPDF
+    getProjectPDF,
+    getProjectTimesheets
 };

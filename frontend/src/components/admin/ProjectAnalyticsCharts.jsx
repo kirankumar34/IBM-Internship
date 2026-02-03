@@ -6,6 +6,7 @@ import api from '../../context/api';
 const ProjectAnalyticsCharts = ({ projectId }) => {
     const [analytics, setAnalytics] = useState(null);
     const [error, setError] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (projectId) {
@@ -14,7 +15,7 @@ const ProjectAnalyticsCharts = ({ projectId }) => {
     }, [projectId]);
 
     const fetchAnalytics = async () => {
-        // setLoading is not defined in this component, removing it
+        setLoading(true);
         setError(null);
         try {
             const response = await api.get(`/analytics/project/${projectId}/progress`);
@@ -90,7 +91,7 @@ const ProjectAnalyticsCharts = ({ projectId }) => {
                         <Activity size={20} className="text-blue-400" />
                         <p className="text-xs text-blue-400 font-medium">Overall Progress</p>
                     </div>
-                    <p className="text-3xl font-bold text-white">{analytics.overallProgress}%</p>
+                    <p className="text-3xl font-bold text-white">{analytics.overallProgress ?? 0}%</p>
                 </div>
 
                 <div className="bg-gradient-to-br from-green-500/10 to-green-600/10 border border-green-500/30 rounded-xl p-4">
@@ -98,7 +99,7 @@ const ProjectAnalyticsCharts = ({ projectId }) => {
                         <CheckCircle2 size={20} className="text-green-400" />
                         <p className="text-xs text-green-400 font-medium">Task Completion</p>
                     </div>
-                    <p className="text-3xl font-bold text-white">{analytics.tasks.completionRate}%</p>
+                    <p className="text-3xl font-bold text-white">{analytics.tasks?.completionRate ?? 0}%</p>
                 </div>
 
                 <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 border border-purple-500/30 rounded-xl p-4">
@@ -107,7 +108,7 @@ const ProjectAnalyticsCharts = ({ projectId }) => {
                         <p className="text-xs text-purple-400 font-medium">Milestones</p>
                     </div>
                     <p className="text-3xl font-bold text-white">
-                        {analytics.milestones.completed}/{analytics.milestones.total}
+                        {analytics.milestones?.completed ?? 0}/{analytics.milestones?.total ?? 0}
                     </p>
                 </div>
 
@@ -116,7 +117,7 @@ const ProjectAnalyticsCharts = ({ projectId }) => {
                         <Clock size={20} className="text-orange-400" />
                         <p className="text-xs text-orange-400 font-medium">Total Tasks</p>
                     </div>
-                    <p className="text-3xl font-bold text-white">{analytics.tasks.total}</p>
+                    <p className="text-3xl font-bold text-white">{analytics.tasks?.total ?? 0}</p>
                 </div>
             </div>
 
@@ -183,7 +184,7 @@ const ProjectAnalyticsCharts = ({ projectId }) => {
                 </div>
 
                 {/* Weekly Effort Trend */}
-                {analytics.weeklyEffort.length > 0 && (
+                {Array.isArray(analytics.weeklyEffort) && analytics.weeklyEffort.length > 0 && (
                     <div className="col-span-2 bg-dark-900 border border-dark-600 rounded-xl p-6">
                         <h4 className="text-lg font-semibold text-white mb-4">Weekly Effort Trend (Last 8 Weeks)</h4>
                         <ResponsiveContainer width="100%" height={250}>
