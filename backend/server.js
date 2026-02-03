@@ -24,6 +24,11 @@ app.use('/uploads', express.static('uploads'));
 // Make io accessible to routes
 app.use((req, res, next) => {
     req.io = io;
+    const fs = require('fs');
+    res.on('finish', () => {
+        const logLine = `${req.method} ${req.originalUrl} ${res.statusCode}\n`;
+        fs.appendFileSync('request_logs.txt', logLine);
+    });
     next();
 });
 

@@ -18,7 +18,7 @@ const TeamMemberDashboard = () => {
 
     const updateStatus = async (taskId, newStatus) => {
         try {
-            await api.put(`/tasks/${taskId}`, { status: newStatus });
+            await api.patch(`/tasks/${taskId}/status`, { status: newStatus });
             toast.info(`Task status: ${newStatus}`);
             fetchMyTasks();
         } catch (err) { toast.error('Update failed'); }
@@ -36,7 +36,7 @@ const TeamMemberDashboard = () => {
                     <div key={t._id} className="bg-dark-700 p-6 rounded-3xl border border-dark-600 flex flex-col group hover:border-primary/50 transition-all shadow-xl">
                         <div className="flex items-center justify-between mb-4">
                             <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${t.status === 'Completed' ? 'bg-green-500/20 text-green-500' :
-                                    t.status === 'In Progress' ? 'bg-primary/20 text-primary' : 'bg-dark-800 text-dark-500'
+                                t.status === 'In Progress' ? 'bg-primary/20 text-primary' : 'bg-dark-800 text-dark-500'
                                 }`}>
                                 {t.status}
                             </span>

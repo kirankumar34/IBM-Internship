@@ -66,11 +66,30 @@ const getGlobalStats = asyncHandler(async (req, res) => {
             value: Math.round(weeklyEffortMap[week] * 10) / 10
         }));
 
+    // Per-project effort breakdown (only for admin)
+    let projectEffort = [];
+    if (role === 'super_admin') {
+        const allLogs = await TimeLog.find({});
+        const effortMap = {};
+        allLogs.forEach(l => {
+            effortMap[l.project] = (effortMap[l.project] || 0) + l.duration;
+        });
+
+        projectEffort = projects.map(p => ({
+            name: p.name,
+            hours: Math.round((effortMap[p._id] || 0) * 10) / 10
+        })).sort((a, b) => b.hours - a.hours).slice(0, 5);
+    }
+
+    const pendingHours = await IndividualTimesheet.find({ status: 'submitted' }).then(tss => tss.reduce((s, t) => s + t.totalHours, 0));
+
     res.json({
         totalProjects,
         totalUsers: await User.countDocuments(role === 'super_admin' ? {} : { organizationId: req.user.organizationId }),
         totalTasks,
         totalHours,
+        pendingHours, // Added for admin overview
+        projectEffort, // Added for admin overview
         taskCompletionRate, // Used by dashboard
         avgCompletionRate: taskCompletionRate, // Legacy alias
         globalWeeklyEffort, // Added for dashboard chart

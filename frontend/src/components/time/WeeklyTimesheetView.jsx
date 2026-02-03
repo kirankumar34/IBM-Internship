@@ -91,18 +91,7 @@ const WeeklyTimesheetView = ({ userId, isAdminView = false }) => {
 
     const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
-    // MOCK DATA Fallback if backend returns nothing
-    const MOCK_WEEKLY_DATA = {
-        totalHours: 39.6,
-        status: 'approved',
-        entries: [
-            { day: 'MON', duration: 7.2, task: { title: 'Dashboard UI Fixes' }, _id: 'm1' },
-            { day: 'TUE', duration: 8.9, task: { title: 'Client Feedback' }, _id: 'm2' },
-            { day: 'WED', duration: 8.2, task: { title: 'API Integration' }, _id: 'm3' },
-            { day: 'THU', duration: 7.7, task: { title: 'Testing' }, _id: 'm4' },
-            { day: 'FRI', duration: 7.6, task: { title: 'Code Review' }, _id: 'm5' },
-        ]
-    };
+
 
     const getLogsForDay = (dayIndex) => {
         const dayUpper = days[dayIndex];
@@ -117,27 +106,12 @@ const WeeklyTimesheetView = ({ userId, isAdminView = false }) => {
                 return logDate.toDateString() === targetDate.toDateString();
             });
         }
-
-        // Use Mock Data if backend data is missing/empty
-        // The mock data array is already ordered Mon-Fri (0-4).
-        // If dayIndex corresponds to Sat(5) or Sun(6), we might not have mock data, so safe check.
-        const mockEntry = MOCK_WEEKLY_DATA.entries[dayIndex];
-
-        if (mockEntry) {
-            // Transform the single object into an array of 1 for the map function
-            return [{
-                _id: mockEntry._id,
-                duration: mockEntry.duration,
-                task: mockEntry.task
-            }];
-        }
-
         return [];
     };
 
-    // Calculate display totals (Real or Mock)
-    const displayTotalHours = timesheet?.totalHours || MOCK_WEEKLY_DATA.totalHours;
-    const displayStatus = timesheet?.status || MOCK_WEEKLY_DATA.status;
+    // Calculate display totals (Real)
+    const displayTotalHours = timesheet?.totalHours || 0;
+    const displayStatus = timesheet?.status || 'draft';
 
     const getStatusColor = (status) => {
         switch (status) {

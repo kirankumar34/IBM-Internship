@@ -7,7 +7,8 @@ import {
     TrendingDown,
     MoreVertical,
     Briefcase,
-    Plus
+    Plus,
+    Clock
 } from 'lucide-react';
 import {
     AreaChart,
@@ -44,32 +45,40 @@ const DefaultDashboard = () => {
 
     const fetchData = async () => {
         try {
-            const [projRes, tasksRes, analyticsRes] = await Promise.all([
+            // Use allSettled to prevent one failure from breaking everything
+            const results = await Promise.allSettled([
                 api.get('/projects'),
                 api.get('/tasks'),
                 api.get('/analytics/global')
             ]);
 
-            setProjects(projRes.data);
-            setGlobalStats(analyticsRes.data);
+            const [projRes, tasksRes, analyticsRes] = results;
 
-            const tasks = tasksRes.data;
-            const total = tasks.length;
-            const active = tasks.filter(t => t.status !== 'Completed').length;
+            if (projRes.status === 'fulfilled' && Array.isArray(projRes.value.data)) {
+                setProjects(projRes.value.data);
+            } else {
+                console.error('Projects fetch failed or invalid', projRes.reason);
+                setProjects([]);
+            }
 
-            setStats({
-                totalTasks: total,
-                activeTasks: active,
-                pendingTasksTrend: 0 // Removed mock
-            });
+            if (tasksRes.status === 'fulfilled' && Array.isArray(tasksRes.value.data)) {
+                const tasks = tasksRes.value.data;
+                const total = tasks.length;
+                const active = tasks.filter(t => t.status !== 'Completed').length;
+                setStats(prev => ({ ...prev, totalTasks: total, activeTasks: active }));
+            }
 
-            // Use real chart data if available
-            if (analyticsRes.data.globalWeeklyEffort) {
-                setChartData(analyticsRes.data.globalWeeklyEffort);
+            if (analyticsRes.status === 'fulfilled' && analyticsRes.value.data) {
+                setGlobalStats(analyticsRes.value.data);
+                // Use real chart data if available
+                if (analyticsRes.value.data.globalWeeklyEffort) {
+                    setChartData(analyticsRes.value.data.globalWeeklyEffort);
+                }
             }
 
         } catch (err) {
-            console.error(err);
+            console.error('Critical Dashboard Error:', err);
+            toast.error('Dashboard loaded with limited data.');
         }
     };
 
@@ -207,12 +216,12 @@ const DefaultDashboard = () => {
 
                 {/* Right Mini Cards */}
                 <div className="space-y-6">
-                    <div className="bg-dark-700 p-6 rounded-2xl border border-dark-600 h-[calc(50%-12px)]">
+                    <div className="bg-dark-700 p-6 rounded-2xl border border-dark-600 h-[calc(50%-12px)] flex flex-col justify-center">
                         <div className="flex justify-between mb-2">
-                            <div className="bg-primary/20 p-2 rounded-lg text-primary"><Briefcase size={18} /></div>
+                            <div className="bg-orange-500/20 p-2 rounded-lg text-orange-400"><Clock size={18} /></div>
                         </div>
-                        <div className="text-dark-500 text-xs">New Projects</div>
-                        <div className="text-2xl font-bold text-white">12 <span className="text-xs text-primary font-normal">+8%</span></div>
+                        <div className="text-dark-500 text-xs">Pending Approval</div>
+                        <div className="text-2xl font-bold text-white">{globalStats ? globalStats.pendingHours : 0} <span className="text-sm text-dark-500 font-normal">hrs</span></div>
                     </div>
                     <div className="bg-dark-700 p-6 rounded-2xl border border-dark-600 h-[calc(50%-12px)] relative overflow-hidden flex flex-col">
                         <h3 className="text-dark-400 text-xs font-bold uppercase tracking-widest mb-1">Total Effort (Approved)</h3>
@@ -233,6 +242,28 @@ const DefaultDashboard = () => {
                     </div>
                 </div>
             </div>
+
+            {user?.role === 'super_admin' && globalStats?.projectEffort?.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="lg:col-span-4 bg-dark-700 p-6 rounded-2xl border border-dark-600">
+                        <h3 className="text-white text-lg font-bold mb-6">Effort by Project (Top 5)</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                            {globalStats.projectEffort.map((p, i) => (
+                                <div key={i} className="bg-dark-800 p-4 rounded-xl border border-dark-600">
+                                    <p className="text-dark-400 text-[10px] font-black uppercase tracking-widest mb-2 truncate">{p.name}</p>
+                                    <p className="text-xl font-black text-white">{p.hours} <span className="text-xs text-dark-500">hrs</span></p>
+                                    <div className="mt-4 h-1.5 w-full bg-dark-600 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-primary"
+                                            style={{ width: `${Math.min(100, (p.hours / Math.max(...globalStats.projectEffort.map(x => x.hours))) * 100)}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Bottom Section */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -265,7 +296,7 @@ const DefaultDashboard = () => {
                                     <tr key={project._id} className="border-b border-dark-600 last:border-0 hover:bg-dark-800 transition">
                                         <td className="py-4 pl-2 flex items-center space-x-3">
                                             <div className="w-9 h-9 rounded-full bg-dark-600 flex items-center justify-center text-[10px] font-black text-white shadow-lg border border-dark-500/20">
-                                                {project.name.substring(0, 2).toUpperCase()}
+                                                {project.name?.substring(0, 2).toUpperCase() || 'P'}
                                             </div>
                                             <div>
                                                 <div className="text-white font-bold">{project.name}</div>
@@ -320,102 +351,106 @@ const DefaultDashboard = () => {
             </div>
 
             {/* Super Admin: Access Tracking */}
-            {user?.role === 'super_admin' && (
-                <div className="mt-12 animate-in fade-in slide-in-from-bottom-10 duration-700">
-                    <div className="flex items-center space-x-4 mb-8">
-                        <div className="h-12 w-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-lg shadow-primary/5">
-                            <Shield size={24} />
+            {
+                user?.role === 'super_admin' && (
+                    <div className="mt-12 animate-in fade-in slide-in-from-bottom-10 duration-700">
+                        <div className="flex items-center space-x-4 mb-8">
+                            <div className="h-12 w-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-lg shadow-primary/5">
+                                <Shield size={24} />
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-black text-white tracking-tight">Access Continuity</h2>
+                                <p className="text-dark-400 text-sm font-medium uppercase tracking-widest bg-dark-800 px-3 py-1 rounded-lg w-fit mt-1">Global Security Overview</p>
+                            </div>
                         </div>
-                        <div>
-                            <h2 className="text-2xl font-black text-white tracking-tight">Access Continuity</h2>
-                            <p className="text-dark-400 text-sm font-medium uppercase tracking-widest bg-dark-800 px-3 py-1 rounded-lg w-fit mt-1">Global Security Overview</p>
-                        </div>
+                        <LoginActivityTable />
                     </div>
-                    <LoginActivityTable />
-                </div>
-            )}
+                )
+            }
 
             {/* Modal */}
-            {showModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-dark-700 rounded-2xl border border-dark-600 max-w-lg w-full p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-                        <h2 className="text-2xl font-bold text-white mb-4">Create New Project</h2>
-                        <form onSubmit={handleCreate} className="space-y-4">
-                            <input
-                                className="w-full px-4 py-3 bg-dark-800 border border-dark-600 rounded-xl text-white focus:ring-2 focus:ring-primary focus:outline-none transition"
-                                placeholder="Project Name"
-                                value={newProject.name}
-                                onChange={e => setNewProject({ ...newProject, name: e.target.value })}
-                                required
-                            />
-                            <textarea
-                                className="w-full px-4 py-3 bg-dark-800 border border-dark-600 rounded-xl text-white focus:ring-2 focus:ring-primary focus:outline-none transition"
-                                placeholder="Description"
-                                rows="3"
-                                value={newProject.description}
-                                onChange={e => setNewProject({ ...newProject, description: e.target.value })}
-                                required
-                            />
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-sm text-dark-500 mb-1 block">Start Date</label>
-                                    <input
-                                        type="date"
-                                        className="w-full px-4 py-2 bg-dark-800 border border-dark-600 rounded-xl text-white focus:ring-2 focus:ring-primary"
-                                        value={newProject.startDate}
-                                        onChange={e => setNewProject({ ...newProject, startDate: e.target.value })}
-                                        required
-                                    />
+            {
+                showModal && (
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                        <div className="bg-dark-700 rounded-2xl border border-dark-600 max-w-lg w-full p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                            <h2 className="text-2xl font-bold text-white mb-4">Create New Project</h2>
+                            <form onSubmit={handleCreate} className="space-y-4">
+                                <input
+                                    className="w-full px-4 py-3 bg-dark-800 border border-dark-600 rounded-xl text-white focus:ring-2 focus:ring-primary focus:outline-none transition"
+                                    placeholder="Project Name"
+                                    value={newProject.name}
+                                    onChange={e => setNewProject({ ...newProject, name: e.target.value })}
+                                    required
+                                />
+                                <textarea
+                                    className="w-full px-4 py-3 bg-dark-800 border border-dark-600 rounded-xl text-white focus:ring-2 focus:ring-primary focus:outline-none transition"
+                                    placeholder="Description"
+                                    rows="3"
+                                    value={newProject.description}
+                                    onChange={e => setNewProject({ ...newProject, description: e.target.value })}
+                                    required
+                                />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-sm text-dark-500 mb-1 block">Start Date</label>
+                                        <input
+                                            type="date"
+                                            className="w-full px-4 py-2 bg-dark-800 border border-dark-600 rounded-xl text-white focus:ring-2 focus:ring-primary"
+                                            value={newProject.startDate}
+                                            onChange={e => setNewProject({ ...newProject, startDate: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm text-dark-500 mb-1 block">End Date</label>
+                                        <input
+                                            type="date"
+                                            className="w-full px-4 py-2 bg-dark-800 border border-dark-600 rounded-xl text-white focus:ring-2 focus:ring-primary"
+                                            value={newProject.endDate}
+                                            onChange={e => setNewProject({ ...newProject, endDate: e.target.value })}
+                                            required
+                                        />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="text-sm text-dark-500 mb-1 block">End Date</label>
-                                    <input
-                                        type="date"
-                                        className="w-full px-4 py-2 bg-dark-800 border border-dark-600 rounded-xl text-white focus:ring-2 focus:ring-primary"
-                                        value={newProject.endDate}
-                                        onChange={e => setNewProject({ ...newProject, endDate: e.target.value })}
-                                        required
-                                    />
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-[10px] font-black text-dark-500 uppercase tracking-widest pl-2 mb-1 block">Primary Project Manager</label>
+                                        <select
+                                            className="w-full px-4 py-3 bg-dark-800 border border-dark-600 rounded-xl text-white focus:ring-2 focus:ring-primary focus:outline-none"
+                                            value={newProject.primaryPmId}
+                                            onChange={e => setNewProject({ ...newProject, primaryPmId: e.target.value })}
+                                            required
+                                        >
+                                            <option value="">Select Primary PM</option>
+                                            {managers.map(m => (
+                                                <option key={m._id} value={m._id} disabled={m._id === newProject.assistantPmId}>{m.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-dark-500 uppercase tracking-widest pl-2 mb-1 block">Assistant PM (Optional)</label>
+                                        <select
+                                            className="w-full px-4 py-3 bg-dark-800 border border-dark-600 rounded-xl text-white focus:ring-2 focus:ring-primary focus:outline-none"
+                                            value={newProject.assistantPmId}
+                                            onChange={e => setNewProject({ ...newProject, assistantPmId: e.target.value })}
+                                        >
+                                            <option value="">None</option>
+                                            {managers.map(m => (
+                                                <option key={m._id} value={m._id} disabled={m._id === newProject.primaryPmId}>{m.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-[10px] font-black text-dark-500 uppercase tracking-widest pl-2 mb-1 block">Primary Project Manager</label>
-                                    <select
-                                        className="w-full px-4 py-3 bg-dark-800 border border-dark-600 rounded-xl text-white focus:ring-2 focus:ring-primary focus:outline-none"
-                                        value={newProject.primaryPmId}
-                                        onChange={e => setNewProject({ ...newProject, primaryPmId: e.target.value })}
-                                        required
-                                    >
-                                        <option value="">Select Primary PM</option>
-                                        {managers.map(m => (
-                                            <option key={m._id} value={m._id} disabled={m._id === newProject.assistantPmId}>{m.name}</option>
-                                        ))}
-                                    </select>
+                                <div className="flex justify-end space-x-3 mt-6">
+                                    <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-dark-500 hover:text-white transition">Cancel</button>
+                                    <button type="submit" className="px-6 py-2 bg-primary text-dark-900 font-bold rounded-xl hover:bg-primary-hover shadow-lg shadow-primary/20">Launch Project</button>
                                 </div>
-                                <div>
-                                    <label className="text-[10px] font-black text-dark-500 uppercase tracking-widest pl-2 mb-1 block">Assistant PM (Optional)</label>
-                                    <select
-                                        className="w-full px-4 py-3 bg-dark-800 border border-dark-600 rounded-xl text-white focus:ring-2 focus:ring-primary focus:outline-none"
-                                        value={newProject.assistantPmId}
-                                        onChange={e => setNewProject({ ...newProject, assistantPmId: e.target.value })}
-                                    >
-                                        <option value="">None</option>
-                                        {managers.map(m => (
-                                            <option key={m._id} value={m._id} disabled={m._id === newProject.primaryPmId}>{m.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="flex justify-end space-x-3 mt-6">
-                                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-dark-500 hover:text-white transition">Cancel</button>
-                                <button type="submit" className="px-6 py-2 bg-primary text-dark-900 font-bold rounded-xl hover:bg-primary-hover shadow-lg shadow-primary/20">Launch Project</button>
-                            </div>
-                        </form>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

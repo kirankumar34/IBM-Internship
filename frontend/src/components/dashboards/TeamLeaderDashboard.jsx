@@ -12,14 +12,16 @@ const TeamLeaderDashboard = () => {
 
     useEffect(() => {
         const loadData = async () => {
-            const [p, t, u] = await Promise.all([
+            const results = await Promise.allSettled([
                 api.get('/projects'),
-                api.get('/tasks'), // Might need filtering on backend by role
+                api.get('/tasks'),
                 api.get('/users')
             ]);
-            setProjects(p.data);
-            setTasks(t.data);
-            setTeam(u.data.filter(user => user.role === 'team_member'));
+            const [p, t, u] = results;
+
+            if (p.status === 'fulfilled') setProjects(p.value.data);
+            if (t.status === 'fulfilled') setTasks(t.value.data);
+            if (u.status === 'fulfilled') setTeam(u.value.data.filter(user => user.role === 'team_member'));
         };
         loadData();
     }, []);

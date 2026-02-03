@@ -57,7 +57,6 @@ const ProjectDetail = () => {
     // PM Edit State
     const [showPmEditModal, setShowPmEditModal] = useState(false);
     const [pmEditForm, setPmEditForm] = useState({ primaryPmId: '', assistantPmId: '' });
-
     const fetchData = async () => {
         try {
             const res = await api.get(`/projects/${id}`);
@@ -75,7 +74,8 @@ const ProjectDetail = () => {
             });
             setLoading(false);
         } catch (err) {
-            toast.error('Failed to load project details');
+            console.error('Project Load Error:', err);
+            toast.error(`Failed to load project details: ${err.response?.data?.message || err.message}`);
             navigate('/projects');
         }
     };
@@ -606,7 +606,7 @@ const ProjectDetail = () => {
 
                 {activeTab === 'time' && (
                     <div className="lg:col-span-3 animate-in fade-in slide-in-from-bottom-10 duration-500">
-                        <WeeklyTimesheetView />
+                        <WeeklyTimesheetView userId={user.id} />
                     </div>
                 )}
 

@@ -54,7 +54,7 @@ timesheetSchema.index({ user: 1, weekStartDate: 1 }, { unique: true });
 // Calculate total hours from entries
 timesheetSchema.methods.calculateTotalHours = async function () {
     await this.populate('entries');
-    this.totalHours = this.entries.reduce((sum, entry) => sum + (entry.duration || 0), 0);
+    this.totalHours = this.entries.filter(e => e != null).reduce((sum, entry) => sum + (entry.duration || 0), 0);
     return this.totalHours;
 };
 

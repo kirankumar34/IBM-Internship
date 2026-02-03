@@ -2,8 +2,12 @@ import Sidebar from './Sidebar';
 import { Search, Moon } from 'lucide-react';
 import NotificationBell from './notifications/NotificationBell';
 import GlobalTimer from './time/GlobalTimer';
+import { useLocation } from 'react-router-dom';
 
 const Layout = ({ children }) => {
+    const location = useLocation();
+    const pageName = location.pathname.split('/')[1] || 'Overview';
+
     return (
         <div className="min-h-screen bg-dark-900 flex">
             <Sidebar />
@@ -16,7 +20,7 @@ const Layout = ({ children }) => {
                     <div className="flex items-center text-dark-500 text-sm">
                         <span className="hover:text-white cursor-pointer transition">Dashboards</span>
                         <span className="mx-2">/</span>
-                        <span className="text-white">Overview</span>
+                        <span className="text-white capitalize">{pageName}</span>
                     </div>
 
                     {/* Right Actions */}

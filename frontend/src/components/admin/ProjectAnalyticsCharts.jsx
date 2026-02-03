@@ -14,7 +14,7 @@ const ProjectAnalyticsCharts = ({ projectId }) => {
     }, [projectId]);
 
     const fetchAnalytics = async () => {
-        setLoading(true);
+        // setLoading is not defined in this component, removing it
         setError(null);
         try {
             const response = await api.get(`/analytics/project/${projectId}/progress`);

@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const Task = require('../models/taskModel');
 const Project = require('../models/projectModel');
 const Activity = require('../models/activityModel');
+const Notification = require('../models/notificationModel');
 
 // Helper to check for circular dependencies
 const hasCircularDependency = async (taskId, dependencies) => {
@@ -31,7 +32,6 @@ const getTasks = asyncHandler(async (req, res) => {
     if (req.query.projectId) {
         query.project = req.query.projectId;
     }
-    // If not super_admin/PM, maybe restrict? For now, let's allow fetching to support dashboard logic.
 
     const tasks = await Task.find(query)
         .populate('assignedTo', 'name email')
@@ -81,30 +81,42 @@ const createTask = asyncHandler(async (req, res) => {
         const assignee = await User.findById(assignedTo);
 
         if (req.user.role === 'project_manager') {
-            // PM can only assign to Team Leaders
             if (assignee && assignee.role !== 'team_leader') {
                 res.status(403);
-                await task.deleteOne(); // Rollback
+                await task.deleteOne();
                 throw new Error('Project Managers can only assign tasks to Team Leaders');
             }
         } else if (req.user.role === 'team_leader') {
-            // STRICT VALIDATION:
-            // 1. Assignee must be in project.members
             const isProjectMember = project.members.some(m => m.toString() === assignedTo.toString());
 
             if (!isProjectMember) {
                 res.status(403);
-                await task.deleteOne(); // Rollback
+                await task.deleteOne();
                 throw new Error('Selected user is not a member of this project');
             }
 
-            // 2. Assignee must be a TEAM_MEMBER (Block Clients, PMs, etc.)
             if (assignee.role !== 'team_member') {
                 res.status(403);
-                await task.deleteOne(); // Rollback
+                await task.deleteOne();
                 throw new Error('Tasks can only be assigned to Team Members');
             }
+        }
 
+        // ========== NOTIFICATION: Task Assigned ==========
+        if (assignedTo.toString() !== req.user.id.toString()) {
+            try {
+                await Notification.create({
+                    recipient: assignedTo,
+                    sender: req.user.id,
+                    type: 'task_assigned',
+                    title: 'New Task Assigned',
+                    message: `You have been assigned to task: "${title}"`,
+                    refModel: 'Task',
+                    refId: task._id
+                });
+            } catch (err) {
+                console.error('Notification error:', err.message);
+            }
         }
     }
 
@@ -112,19 +124,17 @@ const createTask = asyncHandler(async (req, res) => {
 });
 
 // @desc    Update task status
-// @route   PUT /api/tasks/:id
+// @route   PATCH /api/tasks/:id/status
 // @access  Private (Assignee/TL/PM)
 const updateTaskStatus = asyncHandler(async (req, res) => {
-    const { status } = req.body;
-    const task = await Task.findById(req.params.id);
+    const { status, blockedReason } = req.body;
+    const task = await Task.findById(req.params.id).populate('project', 'owner');
 
     if (!task) {
         res.status(404);
         throw new Error('Task not found');
     }
 
-    // Permission check: Assignee can update to In Progress/Completed. 
-    // TL/PM/Admin can update anything.
     const isAssignee = task.assignedTo?.toString() === req.user.id.toString();
     const isSuperior = ['super_admin', 'project_manager', 'team_leader'].includes(req.user.role);
 
@@ -133,8 +143,42 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
         throw new Error('You cannot update this task');
     }
 
+    const oldStatus = task.status;
     task.status = status;
+    if (status === 'Blocked' && blockedReason) {
+        task.blockedReason = blockedReason;
+    }
     await task.save();
+
+    // ========== NOTIFICATION: Task Completed ==========
+    if (status === 'Completed' && oldStatus !== 'Completed') {
+        try {
+            const recipients = [];
+
+            if (task.project?.owner && task.project.owner.toString() !== req.user.id.toString()) {
+                recipients.push(task.project.owner);
+            }
+
+            if (task.createdBy && task.createdBy.toString() !== req.user.id.toString() &&
+                !recipients.some(r => r.toString() === task.createdBy.toString())) {
+                recipients.push(task.createdBy);
+            }
+
+            for (const recipientId of recipients) {
+                await Notification.create({
+                    recipient: recipientId,
+                    sender: req.user.id,
+                    type: 'task_updated',
+                    title: 'Task Completed',
+                    message: `Task "${task.title}" has been marked as completed`,
+                    refModel: 'Task',
+                    refId: task._id
+                });
+            }
+        } catch (err) {
+            console.error('Notification error:', err.message);
+        }
+    }
 
     res.status(200).json(task);
 });
@@ -143,7 +187,7 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
 // @route   PUT /api/tasks/:id
 // @access  Private (PM/Admin)
 const updateTask = asyncHandler(async (req, res) => {
-    const { dependencies } = req.body;
+    const { dependencies, assignedTo: newAssignee } = req.body;
     const task = await Task.findById(req.params.id);
 
     if (!task) {
@@ -151,7 +195,8 @@ const updateTask = asyncHandler(async (req, res) => {
         throw new Error('Task not found');
     }
 
-    // Circular Dependency Check
+    const oldAssignee = task.assignedTo?.toString();
+
     if (dependencies && dependencies.length > 0) {
         if (await hasCircularDependency(task._id, dependencies)) {
             res.status(400);
@@ -159,7 +204,6 @@ const updateTask = asyncHandler(async (req, res) => {
         }
     }
 
-    // Sanitize empty strings for ObjectIds
     if (req.body.assignedTo === "") req.body.assignedTo = null;
     if (req.body.parentTask === "") req.body.parentTask = null;
 
@@ -168,9 +212,25 @@ const updateTask = asyncHandler(async (req, res) => {
         runValidators: true
     }).populate('assignedTo', 'name email').populate('dependencies', 'title status');
 
+    // ========== NOTIFICATION: Assignee Changed ==========
+    if (newAssignee && newAssignee !== oldAssignee && newAssignee !== req.user.id.toString()) {
+        try {
+            await Notification.create({
+                recipient: newAssignee,
+                sender: req.user.id,
+                type: 'task_assigned',
+                title: 'Task Assigned to You',
+                message: `You have been assigned to task: "${updatedTask.title}"`,
+                refModel: 'Task',
+                refId: updatedTask._id
+            });
+        } catch (err) {
+            console.error('Notification error:', err.message);
+        }
+    }
+
     res.status(200).json(updatedTask);
 });
-
 
 // @desc    Delete task
 // @route   DELETE /api/tasks/:id
@@ -184,8 +244,6 @@ const deleteTask = asyncHandler(async (req, res) => {
     }
 
     await task.deleteOne();
-
-    // Also delete subtasks?
     await Task.deleteMany({ parentTask: req.params.id });
 
     res.status(200).json({ id: req.params.id });

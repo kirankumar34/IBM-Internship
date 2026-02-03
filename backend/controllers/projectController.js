@@ -17,11 +17,25 @@ const getProjects = asyncHandler(async (req, res) => {
 
     let query = { isArchived: archived === 'true' };
 
-    // If not admin, filter by ownership or membership
+    // If not admin, filter by ownership or membership OR Team association
     if (role !== 'super_admin') {
+        // Find projects where user is explicitly assigned
+        const Team = require('../models/teamModel');
+        const userTeams = await Team.find({
+            $or: [{ leader: id }, { members: id }]
+        }).select('project');
+
+        const teamProjectIds = userTeams.map(t => t.project).filter(pid => pid);
+
         query = {
             ...query,
-            $or: [{ owner: id }, { members: id }, { teamLeads: id }]
+            $or: [
+                { owner: id },
+                { assistantPm: id },
+                { members: id },
+                { teamLeads: id },
+                { _id: { $in: teamProjectIds } }
+            ]
         };
     }
 
@@ -52,15 +66,55 @@ const getProjects = asyncHandler(async (req, res) => {
 // @route   GET /api/projects/:id
 // @access  Private
 const getProject = asyncHandler(async (req, res) => {
-    const project = await Project.findById(req.params.id)
+    const projectId = req.params.id;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    // Requirement 6: logging as requested
+    console.log(`[Access Control] resolving access - ProjectID: ${projectId}, UserID: ${userId}, Role: ${userRole}`);
+
+    const project = await Project.findById(projectId)
         .populate('owner', 'name email role')
         .populate('assistantPm', 'name email role')
         .populate({ path: 'members', select: 'name email role teamId', populate: { path: 'teamId', select: 'name' } })
         .populate({ path: 'teamLeads', select: 'name email role teamId', populate: { path: 'teamId', select: 'name' } });
 
     if (!project) {
+        console.log(`[Access Control] Path: INVALID - Project truly not found: ${projectId}`);
         res.status(404);
         throw new Error('Project not found');
+    }
+
+    // Access Resolution Logic (Requirement 1 & 2)
+    let resolutionPath = null;
+    if (userRole === 'super_admin') {
+        resolutionPath = 'super_admin_bypass';
+    } else if (project.owner?._id.toString() === userId.toString()) {
+        resolutionPath = 'manager (primary)';
+    } else if (project.assistantPm?._id.toString() === userId.toString()) {
+        resolutionPath = 'manager (assistant)';
+    } else if (project.teamLeads.some(lead => lead._id.toString() === userId.toString())) {
+        resolutionPath = 'lead (assigned)';
+    } else if (project.members.some(member => member._id.toString() === userId.toString())) {
+        resolutionPath = 'member (assigned)';
+    } else {
+        // Validate via Team association collection (Requirement 2)
+        const Team = require('../models/teamModel');
+        const hasTeamAccess = await Team.exists({
+            project: projectId,
+            $or: [{ leader: userId }, { members: userId }]
+        });
+        if (hasTeamAccess) {
+            resolutionPath = 'team_association';
+        }
+    }
+
+    console.log(`[Access Control] Resolve Outcome: ${resolutionPath ? 'GRANTED via ' + resolutionPath : 'DENIED'}`);
+
+    if (!resolutionPath) {
+        // Requirement 5: Access denied message
+        res.status(403);
+        throw new Error('Access denied');
     }
 
     const milestones = await Milestone.find({ project: project._id }).sort({ dueDate: 1 });

@@ -46,7 +46,11 @@ const Projects = () => {
     const fetchProjects = async () => {
         try {
             const res = await api.get(`/projects?archived=${showArchived}`);
-            setProjects(res.data);
+            if (Array.isArray(res.data)) {
+                setProjects(res.data);
+            } else {
+                setProjects([]);
+            }
         } catch (err) {
             toast.error('Failed to load projects');
         }
@@ -94,11 +98,12 @@ const Projects = () => {
         }
     };
 
-    const filteredProjects = projects.filter(p => {
+    const filteredProjects = Array.isArray(projects) ? projects.filter(p => {
         const matchesStatus = filter === 'All' || p.status === filter;
-        const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
+        // Safe check for name
+        const matchesSearch = p.name ? p.name.toLowerCase().includes(search.toLowerCase()) : false;
         return matchesStatus && matchesSearch;
-    });
+    }) : [];
 
     // Re-enabled for Super Admin as per Module 5 requirements
     const canCreate = user?.role === 'super_admin';

@@ -21,6 +21,7 @@ import ProjectDetail from './pages/ProjectDetail';
 import PrivateRoute from './components/PrivateRoute';
 
 import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
     return (
@@ -34,21 +35,17 @@ function App() {
                         <Route path="/reset-password/:token" element={<ResetPassword />} />
 
                         <Route element={<PrivateRoute />}>
-                            <Route path="/" element={
-                                <Layout>
-                                    <Dashboard />
-                                </Layout>
-                            } />
-                            <Route path="/projects" element={<Layout><Projects /></Layout>} />
-                            <Route path="/projects/:id" element={<Layout><ProjectDetail /></Layout>} />
-                            <Route path="/team" element={<Layout><Team /></Layout>} />
-                            <Route path="/timesheets" element={<Layout><Timesheets /></Layout>} />
-                            <Route path="/notifications" element={<Layout><Notifications /></Layout>} />
+                            <Route element={<ErrorBoundary><Layout><Dashboard /></Layout></ErrorBoundary>} path="/" />
+                            <Route element={<ErrorBoundary><Layout><Projects /></Layout></ErrorBoundary>} path="/projects" />
+                            <Route element={<ErrorBoundary><Layout><ProjectDetail /></Layout></ErrorBoundary>} path="/projects/:id" />
+                            <Route element={<ErrorBoundary><Layout><Team /></Layout></ErrorBoundary>} path="/team" />
+                            <Route element={<ErrorBoundary><Layout><Timesheets /></Layout></ErrorBoundary>} path="/timesheets" />
+                            <Route element={<ErrorBoundary><Layout><Notifications /></Layout></ErrorBoundary>} path="/notifications" />
 
-                            <Route path="/messages" element={<Layout><Messages /></Layout>} />
-                            <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
-                            <Route path="/settings" element={<Layout><Settings /></Layout>} />
-                            <Route path="/help" element={<Layout><Help /></Layout>} />
+                            <Route element={<ErrorBoundary><Layout><Messages /></Layout></ErrorBoundary>} path="/messages" />
+                            <Route element={<ErrorBoundary><Layout><Analytics /></Layout></ErrorBoundary>} path="/analytics" />
+                            <Route element={<ErrorBoundary><Layout><Settings /></Layout></ErrorBoundary>} path="/settings" />
+                            <Route element={<ErrorBoundary><Layout><Help /></Layout></ErrorBoundary>} path="/help" />
                         </Route>
                     </Routes>
                 </Router>
