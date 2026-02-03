@@ -6,7 +6,8 @@ const {
     getProjectProgress,
     getProjectActivity,
     getLoginActivity,
-    getProjectPDF
+    getProjectPDF,
+    getProjectTimesheets
 } = require('../controllers/analyticsController');
 
 router.use(protect);
@@ -17,6 +18,7 @@ router.get('/global', getGlobalStats);
 // Project specific views
 router.get('/project/:projectId/progress', getProjectProgress);
 router.get('/project/:projectId/activity', getProjectActivity);
+router.get('/project/:projectId/timesheets', getProjectTimesheets);
 router.get('/project/:projectId/pdf', getProjectPDF);
 
 // Admin only views
