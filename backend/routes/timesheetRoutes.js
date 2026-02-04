@@ -54,11 +54,12 @@ const getWeeklyTimesheet = asyncHandler(async (req, res) => {
     let isAuthorized = req.user.id === userId || req.user.role === 'super_admin';
 
     if (!isAuthorized && ['project_manager', 'team_leader'].includes(req.user.role)) {
-        // Check if user is in a project managed by this user
-        // Optimization: For now allow if role is PM/TL, but we should refine this
-        // Ideally: const commonProjects = await Project.countDocuments({ $or: [{ owner: req.user.id }, { teamLeads: req.user.id }], members: userId });
-        // isAuthorized = commonProjects > 0;
-        isAuthorized = true; // Temporary allow for PM/TL to view any user's timesheet (Dashboard flow)
+        // Strict Check: PM/TL must be leading a project where the user is a member
+        const commonProjects = await Project.countDocuments({
+            $or: [{ owner: req.user.id }, { teamLeads: req.user.id }],
+            members: userId
+        });
+        isAuthorized = commonProjects > 0;
     }
 
     if (!isAuthorized) {

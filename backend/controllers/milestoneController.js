@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const Milestone = require('../models/milestoneModel');
 const Project = require('../models/projectModel');
 const Activity = require('../models/activityModel');
+const Notification = require('../models/notificationModel');
 
 // @desc    Get milestones for a project
 // @route   GET /api/projects/:projectId/milestones
@@ -64,6 +65,26 @@ const updateMilestone = asyncHandler(async (req, res) => {
             action: 'Milestone Updated',
             details: `Milestone "${milestone.name}" changed to ${status}.`
         });
+
+        // ========== NOTIFICATION: Milestone Completed ==========
+        if (status === 'Completed') {
+            try {
+                const project = await Project.findById(milestone.project);
+                if (project && project.owner && project.owner.toString() !== req.user.id.toString()) {
+                    await Notification.create({
+                        recipient: project.owner,
+                        sender: req.user.id,
+                        type: 'milestone_completed',
+                        title: 'Milestone Completed',
+                        message: `Milestone "${milestone.name}" has been completed.`,
+                        refModel: 'Project',
+                        refId: project._id
+                    });
+                }
+            } catch (err) {
+                console.error('Notification error:', err.message);
+            }
+        }
 
         // Business Logic: If all milestones completed -> Project auto-moves to Completed
         if (status === 'Completed') {

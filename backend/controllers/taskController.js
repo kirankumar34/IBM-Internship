@@ -150,18 +150,26 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
     }
     await task.save();
 
-    // ========== NOTIFICATION: Task Completed ==========
-    if (status === 'Completed' && oldStatus !== 'Completed') {
+    // ========== NOTIFICATION: Task Status Updated ==========
+    if (status !== oldStatus) {
         try {
             const recipients = [];
 
+            // Notify Project Owner (PM)
             if (task.project?.owner && task.project.owner.toString() !== req.user.id.toString()) {
                 recipients.push(task.project.owner);
             }
 
+            // Notify Task Creator
             if (task.createdBy && task.createdBy.toString() !== req.user.id.toString() &&
                 !recipients.some(r => r.toString() === task.createdBy.toString())) {
                 recipients.push(task.createdBy);
+            }
+
+            // Notify Assignee (if they didn't make the change)
+            if (task.assignedTo && task.assignedTo.toString() !== req.user.id.toString() &&
+                !recipients.some(r => r.toString() === task.assignedTo.toString())) {
+                recipients.push(task.assignedTo);
             }
 
             for (const recipientId of recipients) {
@@ -169,8 +177,8 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
                     recipient: recipientId,
                     sender: req.user.id,
                     type: 'task_updated',
-                    title: 'Task Completed',
-                    message: `Task "${task.title}" has been marked as completed`,
+                    title: 'Task Status Updated',
+                    message: `Task "${task.title}" status changed from ${oldStatus} to ${status}`,
                     refModel: 'Task',
                     refId: task._id
                 });
