@@ -247,6 +247,54 @@ const getProjectPDF = asyncHandler(async (req, res) => {
     doc.end();
 });
 
+// @desc    Project CSV Report
+const getProjectCSV = asyncHandler(async (req, res) => {
+    const { projectId } = req.params;
+    const project = await Project.findById(projectId).populate('owner');
+    if (!project) { res.status(404); throw new Error('Project not found'); }
+
+    const milestones = await Milestone.find({ project: projectId });
+    const tasks = await Task.find({ project: projectId }).populate('assignedTo');
+    const timeLogs = await TimeLog.find({ project: projectId }).populate('user');
+    const progress = await calculateProjectProgress(projectId);
+
+    let csv = `Project Report\n`;
+    csv += `Name,${project.name}\n`;
+    csv += `Status,${project.status}\n`;
+    csv += `Progress,${progress}%\n`;
+    csv += `Total Tasks,${tasks.length}\n`;
+    csv += `Total Effort,${Math.round(timeLogs.reduce((acc, t) => acc + t.duration, 0) * 10) / 10} hours\n\n`;
+
+    csv += `TASKS\n`;
+    csv += `Title,Status,Unpriority,Assignee,Due Date\n`;
+    tasks.forEach(t => {
+        csv += `"${t.title}",${t.status},${t.priority},"${t.assignedTo?.name || 'Unassigned'}",${t.dueDate ? new Date(t.dueDate).toLocaleDateString() : ''}\n`;
+    });
+    csv += `\n`;
+
+    csv += `MILESTONES\n`;
+    csv += `Name,Status,Due Date,Description\n`;
+    milestones.forEach(m => {
+        csv += `"${m.name}",${m.status},${m.dueDate ? new Date(m.dueDate).toLocaleDateString() : ''},"${m.description || ''}"\n`;
+    });
+    csv += `\n`;
+
+    csv += `TIME UTILIZATION\n`;
+    csv += `User,Date,Hours,Task,Status\n`;
+    timeLogs.forEach(l => {
+        csv += `"${l.user?.name || 'Unknown'}",${new Date(l.date).toLocaleDateString()},${l.duration},"${l.task ? 'Task Related' : 'General'}",${l.isApproved ? 'Approved' : 'Pending'}\n`;
+    });
+
+    res.setHeader('Content-disposition', `attachment; filename=Report_${project.name}.csv`);
+    res.setHeader('Content-type', 'text/csv');
+    res.send(csv);
+
+    // log activity
+    await require('../models/activityModel').create({
+        project: projectId, user: req.user.id, action: 'CSV Downloaded', details: `CSV Report for project "${project.name}"`
+    });
+});
+
 // @desc    Get project timesheet analytics
 // @route   GET /api/analytics/project/:projectId/timesheets
 const getProjectTimesheets = asyncHandler(async (req, res) => {
@@ -306,5 +354,6 @@ module.exports = {
     getProjectActivity,
     getLoginActivity,
     getProjectPDF,
+    getProjectCSV,
     getProjectTimesheets
 };

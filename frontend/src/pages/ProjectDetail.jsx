@@ -176,7 +176,6 @@ const ProjectDetail = () => {
     const handleDownloadReport = async () => {
         try {
             toast.info('Generating PDF report...');
-            // Using direct axios call for blob handling
             const token = localStorage.getItem('token');
             const response = await api.get(`/analytics/project/${id}/pdf`, {
                 headers: { Authorization: `Bearer ${token}` },
@@ -194,6 +193,29 @@ const ProjectDetail = () => {
         } catch (err) {
             console.error('Download error:', err);
             toast.error('Failed to generate report');
+        }
+    };
+
+    const handleDownloadCSV = async () => {
+        try {
+            toast.info('Generating CSV data...');
+            const token = localStorage.getItem('token');
+            const response = await api.get(`/analytics/project/${id}/csv`, {
+                headers: { Authorization: `Bearer ${token}` },
+                responseType: 'blob'
+            });
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Project_Report_${project.name}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            toast.success('CSV downloaded successfully');
+        } catch (err) {
+            console.error('Download error:', err);
+            toast.error('Failed to generate CSV');
         }
     };
 
@@ -396,14 +418,23 @@ const ProjectDetail = () => {
                     )}
                 </div>
 
-                {(user?.role === 'super_admin' || user?.role === 'project_manager') && (
-                    <button
-                        onClick={handleDownloadReport}
-                        className="flex items-center space-x-2 bg-dark-700 hover:bg-dark-600 text-white px-6 py-3 rounded-2xl border border-dark-600 font-black text-[10px] uppercase tracking-widest transition group"
-                    >
-                        <Download size={16} className="text-primary group-hover:scale-110 transition" />
-                        <span>Download Progress Report</span>
-                    </button>
+                {(user?.role === 'super_admin' || user?.role === 'project_manager' || user?.role === 'team_leader') && (
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleDownloadCSV}
+                            className="flex items-center space-x-2 bg-dark-700 hover:bg-dark-600 text-white px-4 py-3 rounded-2xl border border-dark-600 font-black text-[10px] uppercase tracking-widest transition group"
+                        >
+                            <Files size={16} className="text-success group-hover:scale-110 transition" />
+                            <span>Export CSV</span>
+                        </button>
+                        <button
+                            onClick={handleDownloadReport}
+                            className="flex items-center space-x-2 bg-dark-700 hover:bg-dark-600 text-white px-4 py-3 rounded-2xl border border-dark-600 font-black text-[10px] uppercase tracking-widest transition group"
+                        >
+                            <Download size={16} className="text-primary group-hover:scale-110 transition" />
+                            <span>Progress Report (PDF)</span>
+                        </button>
+                    </div>
                 )}
             </div>
 

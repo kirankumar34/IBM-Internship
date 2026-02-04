@@ -138,34 +138,36 @@ const FileUpload = ({ taskId, projectId, currentUser }) => {
                 </h3>
             </div>
 
-            {/* Upload Area */}
-            <div
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-lg p-8 text-center transition ${dragActive
-                    ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-dark-600 hover:border-dark-500'
-                    }`}
-            >
-                <Upload size={40} className="mx-auto mb-3 text-gray-500" />
-                <p className="text-gray-400 mb-2">
-                    Drag and drop a file here, or click to select
-                </p>
-                <p className="text-xs text-gray-500 mb-4">
-                    Maximum file size: 10MB
-                </p>
-                <label className="inline-block bg-gradient-to-r from-purple-500 to-pink-600 text-white px-6 py-2 rounded-lg font-medium hover:opacity-90 transition cursor-pointer">
-                    {uploading ? 'Uploading...' : 'Choose File'}
-                    <input
-                        type="file"
-                        onChange={(e) => handleFileUpload(e.target.files)}
-                        className="hidden"
-                        disabled={uploading}
-                    />
-                </label>
-            </div>
+            {/* Upload Area - Hidden for restricted roles */}
+            {!['employee', 'client'].includes(currentUser?.role) && (
+                <div
+                    onDragEnter={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDragOver={handleDrag}
+                    onDrop={handleDrop}
+                    className={`border-2 border-dashed rounded-lg p-8 text-center transition ${dragActive
+                        ? 'border-blue-500 bg-blue-500/10'
+                        : 'border-dark-600 hover:border-dark-500'
+                        }`}
+                >
+                    <Upload size={40} className="mx-auto mb-3 text-gray-500" />
+                    <p className="text-gray-400 mb-2">
+                        Drag and drop a file here, or click to select
+                    </p>
+                    <p className="text-xs text-gray-500 mb-4">
+                        Maximum file size: 10MB
+                    </p>
+                    <label className="inline-block bg-gradient-to-r from-purple-500 to-pink-600 text-white px-6 py-2 rounded-lg font-medium hover:opacity-90 transition cursor-pointer">
+                        {uploading ? 'Uploading...' : 'Choose File'}
+                        <input
+                            type="file"
+                            onChange={(e) => handleFileUpload(e.target.files)}
+                            className="hidden"
+                            disabled={uploading}
+                        />
+                    </label>
+                </div>
+            )}
 
             {/* File List */}
             <div className="space-y-2">
