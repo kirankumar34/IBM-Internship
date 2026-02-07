@@ -46,6 +46,7 @@ require('./models/loginActivityModel');
 require('./models/discussionModel');
 require('./models/notificationModel');
 require('./models/timerSessionModel');
+require('./models/emailLogModel');  // Email simulation logs
 
 // Database Connection
 const connectDB = async () => {
