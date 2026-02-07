@@ -80,6 +80,16 @@ app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/timer', require('./routes/timerRoutes'));
 
 
+// Module 10: Manual Deadline Check Endpoint (for testing/demo)
+app.get('/api/admin/check-deadlines', async (req, res) => {
+    try {
+        const { triggerManualCheck } = require('./services/deadlineReminderService');
+        const result = await triggerManualCheck();
+        res.json({ success: true, ...result });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 
 // Root Route
 app.get('/', (req, res) => {
@@ -102,6 +112,11 @@ connectDB().then(() => {
     server.listen(PORT, () => {
         console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
         console.log('Socket.io initialized for real-time notifications');
+
+        // Module 10: Start Background Deadline Reminder Worker
+        const { startDeadlineWorker } = require('./services/deadlineReminderService');
+        startDeadlineWorker();
+        console.log('Deadline reminder background worker started (runs every hour)');
     });
 });
 
