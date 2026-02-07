@@ -12,6 +12,10 @@ const issueSchema = mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     },
+    assignedTo: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
     severity: {
         type: String,
         enum: ['Low', 'Medium', 'High', 'Critical'],

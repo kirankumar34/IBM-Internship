@@ -59,6 +59,23 @@ const stopTimer = asyncHandler(async (req, res) => {
     const durationSeconds = Math.floor(durationMs / 1000);
     const durationHours = durationSeconds / 3600;
 
+    // Validation: Max 8 hours per day
+    const dayStart = new Date(timer.startTime); dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(timer.startTime); dayEnd.setHours(23, 59, 59, 999);
+
+    // Convert Mongoose model if needed or use straight require if not available in scope (it is required at top)
+    const existingLogs = await TimeLog.find({
+        user: req.user.id,
+        date: { $gte: dayStart, $lte: dayEnd }
+    });
+
+    const totalHours = existingLogs.reduce((acc, log) => acc + log.duration, 0);
+
+    if (totalHours + durationHours > 8) {
+        res.status(400);
+        throw new Error(`Daily limit exceeded. Total: ${totalHours.toFixed(1)}h + New: ${durationHours.toFixed(1)}h > 8h. Timer remains active.`);
+    }
+
     timer.endTime = endTime;
     timer.duration = durationSeconds;
     timer.isActive = false;

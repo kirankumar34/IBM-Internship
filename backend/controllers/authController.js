@@ -38,32 +38,59 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new Error('User already exists');
     }
 
+    const Organization = require('../models/organizationModel');
+
+    // Logic for Organization:
+    // 1. If invited by Admin (currentUser exists), add to their Organization.
+    // 2. If public signup, create a NEW Organization for them.
+    let organizationId = null;
     let intendedRole = role || 'client';
-    let approvalStatus = 'approved'; // Default for clients
+    let approvalStatus = 'approved';
     let requestedRole = null;
 
-    // Logic for Member Registration
-    if (['team_member', 'team_leader', 'project_manager'].includes(intendedRole)) {
-        if (!currentUser || currentUser.role !== 'super_admin') {
-            // If not created by admin, then it requires approval
-            approvalStatus = 'pending';
-            requestedRole = intendedRole;
-            // You might want to set a temporary role or keep it as intended but blocked by status
-            // We'll keep intendedRole but block login via status
+    if (currentUser && currentUser.organizationId) {
+        // Invited by Admin
+        organizationId = currentUser.organizationId;
+
+        if (['team_member', 'team_leader', 'project_manager'].includes(intendedRole)) {
+            if (currentUser.role !== 'super_admin') {
+                approvalStatus = 'pending';
+                requestedRole = intendedRole;
+            }
         }
+    } else {
+        // Public Signup -> Create New Organization
+        const orgName = `${name}'s Organization`;
+        const newOrg = await Organization.create({
+            name: orgName,
+            status: 'active'
+        });
+        organizationId = newOrg._id;
+
+        // Upgrade first user to Super Admin of their own org
+        intendedRole = 'super_admin';
+
+        // Update Org with creator
+        newOrg.createdBy = user ? user._id : null; // We don't have user yet, will update later? 
+        // Actually, let's create user first then update org or just leave createdBy until later
+        // But we need orgId for user creation
     }
 
     const user = await User.create({
         name,
         email,
-        loginId: email, // Default loginId to email for web registers
+        loginId: email,
         password,
         role: intendedRole,
         requestedRole,
         approvalStatus,
-        organizationId: currentUser ? currentUser.organizationId : null,
+        organizationId,
         passwordHistory: []
     });
+
+    if (!currentUser && organizationId) {
+        await Organization.findByIdAndUpdate(organizationId, { createdBy: user._id });
+    }
 
     if (user) {
         res.status(201).json({
@@ -264,6 +291,41 @@ const logoutUser = asyncHandler(async (req, res) => {
     res.json({ message: 'Logged out successfully' });
 });
 
+// @desc    Invite user to organization
+// @route   POST /api/auth/invite
+// @access  Private (Super Admin)
+const inviteUser = asyncHandler(async (req, res) => {
+    const { email, role } = req.body;
+
+    if (req.user.role !== 'super_admin') {
+        res.status(403);
+        throw new Error('Only Super Admins can invite users');
+    }
+
+    // Check if user already exists
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+        res.status(400);
+        throw new Error('User already exists');
+    }
+
+    // Simulate Email
+    const { sendEmail } = require('../services/emailService');
+    const inviterName = req.user.name;
+    const orgName = 'Your Organization'; // In real app, fetch org name
+
+    await sendEmail({
+        recipient: email,
+        recipientName: 'Invited User',
+        subject: `Invitation to join ${orgName}`,
+        body: `Hello,\n\nYou have been invited by ${inviterName} to join ${orgName} as a ${role}.\n\nPlease register using this email to join.\n\nBest regards,\nProject Management System`,
+        type: 'system',
+        metadata: { invitedBy: req.user.id, role }
+    });
+
+    res.json({ message: `Invitation sent to ${email}` });
+});
+
 module.exports = {
     registerUser,
     loginUser,
@@ -271,4 +333,5 @@ module.exports = {
     getMe,
     forgotPassword,
     resetPassword,
+    inviteUser
 };

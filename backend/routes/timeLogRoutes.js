@@ -40,6 +40,32 @@ const createTimeLog = asyncHandler(async (req, res) => {
         throw new Error('Cannot log time for future dates');
     }
 
+    // Validation: Weekdays only (Mon=1 ... Fri=5)
+    const dayOfWeek = logDate.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+        res.status(400);
+        throw new Error('Time logging is only allowed on weekdays (Mon-Fri)');
+    }
+
+    // Validation: Max 8 hours per day
+    const durationHours = (end - start) / (1000 * 60 * 60);
+
+    // Check existing logs for this day
+    const dayStart = new Date(logDate); dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(logDate); dayEnd.setHours(23, 59, 59, 999);
+
+    const existingLogs = await TimeLog.find({
+        user: req.user.id,
+        date: { $gte: dayStart, $lte: dayEnd }
+    });
+
+    const totalHours = existingLogs.reduce((acc, log) => acc + log.duration, 0);
+
+    if (totalHours + durationHours > 8) {
+        res.status(400);
+        throw new Error(`Daily limit exceeded. You have logged ${totalHours.toFixed(1)} hours. Calculating new entry: ${(totalHours + durationHours).toFixed(1)} hours.`);
+    }
+
     // Check if timesheet for this week is already approved
     const Timesheet = require('../models/timesheetModel');
     const weekStart = new Date(logDate);

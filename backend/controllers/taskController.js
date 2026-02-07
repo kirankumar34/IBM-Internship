@@ -128,7 +128,9 @@ const createTask = asyncHandler(async (req, res) => {
 // @access  Private (Assignee/TL/PM)
 const updateTaskStatus = asyncHandler(async (req, res) => {
     const { status, blockedReason } = req.body;
-    const task = await Task.findById(req.params.id).populate('project', 'owner');
+    const task = await Task.findById(req.params.id)
+        .populate('project', 'owner')
+        .populate('dependencies', 'status title');
 
     if (!task) {
         res.status(404);
@@ -141,6 +143,16 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
     if (!isAssignee && !isSuperior) {
         res.status(403);
         throw new Error('You cannot update this task');
+    }
+
+    // Dependency Check
+    if (['In Progress', 'Completed'].includes(status) && task.dependencies.length > 0) {
+        const incompleteDependencies = task.dependencies.filter(dep => dep.status !== 'Completed');
+        if (incompleteDependencies.length > 0) {
+            const depTitles = incompleteDependencies.map(d => d.title).join(', ');
+            res.status(400);
+            throw new Error(`Cannot start this task. Waiting on dependencies: ${depTitles}`);
+        }
     }
 
     const oldStatus = task.status;

@@ -32,15 +32,13 @@ const createDiscussion = asyncHandler(async (req, res) => {
         throw new Error('Project not found');
     }
 
-    // Verify project membership
-    const isMember = project.owner.toString() === req.user.id ||
-        project.members.some(m => m.toString() === req.user.id) ||
-        project.teamLeads.some(t => t.toString() === req.user.id) ||
-        ['super_admin', 'project_admin'].includes(req.user.role);
+    // Verify Role: Only PM/Admin/Owner can create discussions
+    const isAuthorized = project.owner.toString() === req.user.id ||
+        ['super_admin', 'project_admin', 'project_manager'].includes(req.user.role);
 
-    if (!isMember) {
+    if (!isAuthorized) {
         res.status(403);
-        throw new Error('Not authorized to create discussions in this project');
+        throw new Error('Only Project Managers and Admins can create discussions');
     }
 
     const discussion = await Discussion.create({

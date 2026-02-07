@@ -47,6 +47,7 @@ require('./models/discussionModel');
 require('./models/notificationModel');
 require('./models/timerSessionModel');
 require('./models/emailLogModel');  // Email simulation logs
+require('./models/issueModel');
 
 // Database Connection
 const connectDB = async () => {
@@ -80,6 +81,9 @@ app.use('/api/notifications', require('./routes/notificationRoutes'));
 // Module 5: Timer
 app.use('/api/timer', require('./routes/timerRoutes'));
 
+
+// Module 7: Issues
+app.use('/api/issues', require('./routes/issueRoutes'));
 
 // Module 10: Manual Deadline Check Endpoint (for testing/demo)
 app.get('/api/admin/check-deadlines', async (req, res) => {

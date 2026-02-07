@@ -51,11 +51,11 @@ const uploadFile = asyncHandler(async (req, res) => {
     const { taskId, projectId, description } = req.body;
 
     // RBAC: Block Team Members and Clients from uploading
-    if (['employee', 'client'].includes(req.user.role)) {
+    if (['team_member', 'client'].includes(req.user.role)) {
         // Remove uploaded file if authorized check fails to prevent clutter
         if (req.file) fs.unlinkSync(req.file.path);
         res.status(403);
-        throw new Error('Not authorized to upload files');
+        throw new Error('Not authorized to upload files. Only Managers and Leads can upload.');
     }
 
     // Must specify either taskId or projectId (not both)

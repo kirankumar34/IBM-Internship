@@ -9,6 +9,9 @@ const TimeLog = require('../models/timeLogModel');
 describe('TimeLog Model', () => {
     let testUser, testProject, testTask;
 
+    // Use a fixed Friday date for all logs to satisfy weekday validation
+    const LOG_DATE = new Date('2026-02-06T10:00:00Z');
+
     beforeEach(async () => {
         testUser = await global.createTestUser();
         testProject = await global.createTestProject(testUser._id);
@@ -17,14 +20,14 @@ describe('TimeLog Model', () => {
 
     describe('TimeLog Creation', () => {
         it('should create a time log entry', async () => {
-            const startTime = new Date();
+            const startTime = new Date(LOG_DATE);
             const endTime = new Date(startTime.getTime() + 4 * 60 * 60 * 1000); // 4 hours later
 
             const timeLog = await TimeLog.create({
                 user: testUser._id,
                 task: testTask._id,
                 project: testProject._id,
-                date: new Date(),
+                date: LOG_DATE,
                 startTime: startTime,
                 endTime: endTime,
                 duration: 4,
@@ -37,14 +40,14 @@ describe('TimeLog Model', () => {
         });
 
         it('should allow fractional hours', async () => {
-            const startTime = new Date();
+            const startTime = new Date(LOG_DATE);
             const endTime = new Date(startTime.getTime() + 2.5 * 60 * 60 * 1000); // 2.5 hours later
 
             const timeLog = await TimeLog.create({
                 user: testUser._id,
                 task: testTask._id,
                 project: testProject._id,
-                date: new Date(),
+                date: LOG_DATE,
                 startTime: startTime,
                 endTime: endTime,
                 duration: 2.5
@@ -60,9 +63,9 @@ describe('TimeLog Model', () => {
                 user: testUser._id,
                 task: testTask._id,
                 project: testProject._id,
-                date: new Date(),
-                startTime: new Date(),
-                endTime: new Date(Date.now() + 3 * 3600000),
+                date: LOG_DATE,
+                startTime: new Date(LOG_DATE),
+                endTime: new Date(LOG_DATE.getTime() + 3 * 3600000),
                 duration: 3
             });
 
@@ -70,10 +73,10 @@ describe('TimeLog Model', () => {
                 user: testUser._id,
                 task: testTask._id,
                 project: testProject._id,
-                date: new Date(),
-                startTime: new Date(),
-                endTime: new Date(Date.now() + 5 * 3600000),
-                duration: 5
+                date: LOG_DATE,
+                startTime: new Date(LOG_DATE),
+                endTime: new Date(LOG_DATE.getTime() + 4 * 3600000),
+                duration: 4
             });
 
             const result = await TimeLog.aggregate([
@@ -81,7 +84,7 @@ describe('TimeLog Model', () => {
                 { $group: { _id: null, totalHours: { $sum: '$duration' } } }
             ]);
 
-            expect(result[0].totalHours).toBe(8);
+            expect(result[0].totalHours).toBe(7);
         });
 
         it('should calculate hours per project', async () => {
@@ -94,20 +97,20 @@ describe('TimeLog Model', () => {
                 user: testUser._id,
                 task: testTask._id,
                 project: testProject._id,
-                date: new Date(),
-                startTime: new Date(),
-                endTime: new Date(Date.now() + 4 * 3600000),
-                duration: 4
+                date: LOG_DATE,
+                startTime: new Date(LOG_DATE),
+                endTime: new Date(LOG_DATE.getTime() + 3 * 3600000),
+                duration: 3
             });
 
             await TimeLog.create({
                 user: testUser._id,
                 task: task2._id,
                 project: project2._id,
-                date: new Date(),
-                startTime: new Date(),
-                endTime: new Date(Date.now() + 6 * 3600000),
-                duration: 6
+                date: LOG_DATE,
+                startTime: new Date(LOG_DATE),
+                endTime: new Date(LOG_DATE.getTime() + 4 * 3600000),
+                duration: 4
             });
 
             const result = await TimeLog.aggregate([
@@ -115,30 +118,27 @@ describe('TimeLog Model', () => {
                 { $group: { _id: '$project', totalHours: { $sum: '$duration' } } }
             ]);
 
-            // Ensure sorting to match expectations or check existence
-            // The order might vary, so we check using find/filter or specific expectations
             expect(result.length).toBe(2);
             const p1 = result.find(r => r._id.toString() === testProject._id.toString());
             const p2 = result.find(r => r._id.toString() === project2._id.toString());
 
-            expect(p1.totalHours).toBe(4);
-            expect(p2.totalHours).toBe(6);
+            expect(p1.totalHours).toBe(3);
+            expect(p2.totalHours).toBe(4);
         });
     });
 
     describe('TimeLog Date Filtering', () => {
         it('should filter by date range', async () => {
-            const today = new Date();
-            const lastWeek = new Date();
-            lastWeek.setDate(lastWeek.getDate() - 7);
+            const friday = new Date('2026-02-06T10:00:00Z');
+            const lastFriday = new Date('2026-01-30T10:00:00Z');
 
             await TimeLog.create({
                 user: testUser._id,
                 task: testTask._id,
                 project: testProject._id,
-                date: today,
-                startTime: today,
-                endTime: new Date(today.getTime() + 3 * 3600000),
+                date: friday,
+                startTime: friday,
+                endTime: new Date(friday.getTime() + 3 * 3600000),
                 duration: 3
             });
 
@@ -146,14 +146,13 @@ describe('TimeLog Model', () => {
                 user: testUser._id,
                 task: testTask._id,
                 project: testProject._id,
-                date: lastWeek,
-                startTime: lastWeek,
-                endTime: new Date(lastWeek.getTime() + 5 * 3600000),
+                date: lastFriday,
+                startTime: lastFriday,
+                endTime: new Date(lastFriday.getTime() + 5 * 3600000),
                 duration: 5
             });
 
-            const startOfWeek = new Date();
-            startOfWeek.setDate(startOfWeek.getDate() - 3);
+            const startOfWeek = new Date('2026-02-02T00:00:00Z'); // Monday of that week
 
             const recentLogs = await TimeLog.find({
                 date: { $gte: startOfWeek }

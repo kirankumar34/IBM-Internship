@@ -10,6 +10,10 @@ const organizationSchema = mongoose.Schema({
         enum: ['active', 'inactive'],
         default: 'active',
     },
+    createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }
 }, {
     timestamps: true,
 });
