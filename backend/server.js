@@ -85,6 +85,9 @@ app.use('/api/timer', require('./routes/timerRoutes'));
 // Module 7: Issues
 app.use('/api/issues', require('./routes/issueRoutes'));
 
+// Module 9: Reports
+app.use('/api/reports', require('./routes/reportRoutes'));
+
 // Module 10: Manual Deadline Check Endpoint (for testing/demo)
 app.get('/api/admin/check-deadlines', async (req, res) => {
     try {

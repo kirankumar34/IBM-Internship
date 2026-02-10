@@ -168,6 +168,24 @@ const saveTimesheetErrors = asyncHandler(async (req, res) => {
                 }
             });
         } else {
+            // Validate Daily Limit (8 hours)
+            const startOfDay = new Date(logDate); startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(logDate); endOfDay.setHours(23, 59, 59, 999);
+
+            const existingLogs = await TimeLog.find({
+                user: req.user.id,
+                date: { $gte: startOfDay, $lte: endOfDay }
+            });
+
+            // Exclude current task from total (since we are replacing it)
+            const otherLogs = existingLogs.filter(l => l.task.toString() !== entry.taskId);
+            const dailyTotal = otherLogs.reduce((acc, l) => acc + l.duration, 0) + entry.duration;
+
+            if (dailyTotal > 8) {
+                res.status(400);
+                throw new Error(`Daily limit exceeded. Total hours for ${logDate.toLocaleDateString()} cannot exceed 8.`);
+            }
+
             // Calculate dummy start/end based on duration for schema compliance
             // Default start: 9:00 AM
             const start = new Date(logDate);
@@ -355,6 +373,17 @@ const approveTimesheet = asyncHandler(async (req, res) => {
         message: `Your timesheet for week starting ${new Date(timesheet.weekStartDate).toLocaleDateString()} has been approved.`,
         refModel: 'Timesheet',
         refId: timesheet._id
+    });
+
+    // Email Simulation
+    const { sendEmail } = require('../services/emailService');
+    await sendEmail({
+        recipient: timesheet.user.email,
+        recipientName: timesheet.user.name,
+        subject: 'Timesheet Approved',
+        body: `Your timesheet for week starting ${new Date(timesheet.weekStartDate).toLocaleDateString()} has been approved.`,
+        type: 'notification',
+        metadata: { timesheetId: timesheet._id }
     });
 
     res.json(timesheet);

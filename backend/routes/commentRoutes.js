@@ -53,6 +53,28 @@ const createComment = asyncHandler(async (req, res) => {
 
     await comment.populate('user', 'name email');
 
+    // Email Notification
+    const { sendEmail } = require('../services/emailService');
+    try {
+        if (taskId) {
+            const task = await Task.findById(taskId).populate('assignedTo');
+            // Notify Assignee if not the commenter
+            if (task.assignedTo && task.assignedTo._id.toString() !== req.user.id) {
+                await sendEmail({
+                    recipient: task.assignedTo.email,
+                    recipientName: task.assignedTo.name,
+                    subject: `New Comment on Task: ${task.title}`,
+                    body: `User ${req.user.name} commented on task "${task.title}":\n\n"${content.trim()}"`,
+                    type: 'notification',
+                    metadata: { taskId, commentId: comment._id }
+                });
+            }
+        }
+        // Could also notify Project Owner if projectId
+    } catch (err) {
+        console.error('Email notification failed:', err.message);
+    }
+
     res.status(201).json(comment);
 });
 

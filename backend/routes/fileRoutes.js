@@ -50,12 +50,12 @@ const uploadFile = asyncHandler(async (req, res) => {
 
     const { taskId, projectId, description } = req.body;
 
-    // RBAC: Block Team Members and Clients from uploading
-    if (['team_member', 'client'].includes(req.user.role)) {
-        // Remove uploaded file if authorized check fails to prevent clutter
+    // RBAC: Block Clients from uploading (Team Members allowed)
+    if (req.user.role === 'client') {
+        // Remove uploaded file 
         if (req.file) fs.unlinkSync(req.file.path);
         res.status(403);
-        throw new Error('Not authorized to upload files. Only Managers and Leads can upload.');
+        throw new Error('Not authorized to upload files. Clients are read-only.');
     }
 
     // Must specify either taskId or projectId (not both)
@@ -105,6 +105,38 @@ const uploadFile = asyncHandler(async (req, res) => {
     });
 
     await fileRecord.populate('uploader', 'name email');
+
+    // Email Notification
+    const { sendEmail } = require('../services/emailService');
+    try {
+        if (taskId) {
+            const task = await Task.findById(taskId).populate('assignedTo');
+            if (task && task.assignedTo && task.assignedTo._id.toString() !== req.user.id) {
+                await sendEmail({
+                    recipient: task.assignedTo.email,
+                    recipientName: task.assignedTo.name,
+                    subject: `New File Attached to Task: ${task.title}`,
+                    body: `User ${req.user.name} uploaded a file "${fileRecord.originalName}" to task "${task.title}".`,
+                    type: 'notification',
+                    metadata: { taskId, fileId: fileRecord._id }
+                });
+            }
+        } else if (projectId) {
+            const project = await Project.findById(projectId).populate('owner');
+            if (project && project.owner && project.owner._id.toString() !== req.user.id) {
+                await sendEmail({
+                    recipient: project.owner.email,
+                    recipientName: project.owner.name,
+                    subject: `New File Attached to Project: ${project.name}`,
+                    body: `User ${req.user.name} uploaded a file "${fileRecord.originalName}" to project "${project.name}".`,
+                    type: 'notification',
+                    metadata: { projectId, fileId: fileRecord._id }
+                });
+            }
+        }
+    } catch (err) {
+        console.error('Email notification failed:', err.message);
+    }
 
     res.status(201).json(fileRecord);
 });

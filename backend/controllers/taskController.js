@@ -3,6 +3,7 @@ const Task = require('../models/taskModel');
 const Project = require('../models/projectModel');
 const Activity = require('../models/activityModel');
 const Notification = require('../models/notificationModel');
+const { sendEmail } = require('../services/emailService');
 
 // Helper to check for circular dependencies
 const hasCircularDependency = async (taskId, dependencies) => {
@@ -114,8 +115,14 @@ const createTask = asyncHandler(async (req, res) => {
                     refModel: 'Task',
                     refId: task._id
                 });
+                await sendEmail({
+                    recipient: assignee.email,
+                    subject: `New Task Assignment: ${title}`,
+                    message: `You have been assigned to a new task.\n\nTask: ${title}\nPriority: ${priority}\nDue Date: ${dueDate || 'Not set'}\n\nView details in the application.`,
+                    metadata: { taskId: task._id, projectId }
+                });
             } catch (err) {
-                console.error('Notification error:', err.message);
+                console.error('Notification/Email error:', err.message);
             }
         }
     }
@@ -244,8 +251,14 @@ const updateTask = asyncHandler(async (req, res) => {
                 refModel: 'Task',
                 refId: updatedTask._id
             });
+            await sendEmail({
+                recipient: updatedTask.assignedTo.email,
+                subject: `Task Assignment: ${updatedTask.title}`,
+                message: `You have been assigned to task: "${updatedTask.title}".\n\nPlease review the task details.`,
+                metadata: { taskId: updatedTask._id, projectId: updatedTask.project }
+            });
         } catch (err) {
-            console.error('Notification error:', err.message);
+            console.error('Notification/Email error:', err.message);
         }
     }
 

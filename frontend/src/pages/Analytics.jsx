@@ -19,8 +19,10 @@ import {
     PauseCircle,
     CheckCircle,
     LogIn,
-    LogOut
+    LogOut,
+    Download
 } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 const Analytics = () => {
     const { user } = useContext(AuthContext);
@@ -80,6 +82,25 @@ const Analytics = () => {
         { name: 'On Hold', value: stats.projectStatus?.onHold || 0 }
     ].filter(d => d.value > 0);
 
+    const handleExport = async (type) => {
+        try {
+            toast.info(`Generating ${type} report...`);
+            const response = await api.get(`/reports/${type}/export`, { responseType: 'blob' });
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `${type}_report_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            toast.success('Download started');
+        } catch (error) {
+            console.error('Export failed:', error);
+            toast.error('Failed to export report');
+        }
+    };
+
     return (
         <div className="min-h-screen bg-transparent text-white space-y-8 animate-in fade-in duration-500 pb-10">
 
@@ -95,6 +116,16 @@ const Analytics = () => {
                     <div className="hidden md:flex items-center bg-dark-800 border border-dark-700 px-4 py-3 rounded-xl w-64">
                         <Search size={18} className="text-dark-400 mr-2" />
                         <span className="text-sm text-dark-500">Search metrics...</span>
+                    </div>
+
+                    {/* Export Buttons */}
+                    <div className="flex gap-2">
+                        <button onClick={() => handleExport('projects')} className="bg-dark-800 hover:bg-dark-700 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center border border-dark-700 transition shadow-sm" title="Export Projects CSV">
+                            <Download size={14} className="mr-2 text-blue-500" /> Projects
+                        </button>
+                        <button onClick={() => handleExport('tasks')} className="bg-dark-800 hover:bg-dark-700 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center border border-dark-700 transition shadow-sm" title="Export Tasks CSV">
+                            <Download size={14} className="mr-2 text-purple-500" /> Tasks
+                        </button>
                     </div>
                     {/* Status Icons */}
                     <div className="p-3 bg-dark-800 border border-dark-700 rounded-xl relative">

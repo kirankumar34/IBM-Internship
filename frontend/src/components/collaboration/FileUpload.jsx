@@ -139,7 +139,7 @@ const FileUpload = ({ taskId, projectId, currentUser }) => {
             </div>
 
             {/* Upload Area - Hidden for restricted roles */}
-            {!['employee', 'client'].includes(currentUser?.role) && (
+            {currentUser?.role !== 'client' && (
                 <div
                     onDragEnter={handleDrag}
                     onDragLeave={handleDrag}

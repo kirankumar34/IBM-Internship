@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Clock, CheckCircle, XCircle, AlertCircle, ChevronLeft, ChevronRight, Send, FileText, RefreshCw } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, AlertCircle, ChevronLeft, ChevronRight, Send, FileText, RefreshCw, Download } from 'lucide-react';
+import { toast } from 'react-toastify';
 import api from '../context/api';
 import AuthContext from '../context/AuthContext';
 
@@ -262,6 +263,25 @@ const Timesheets = () => {
     const { weekStart, weekEnd } = getWeekDates(currentWeek);
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+    const handleExport = async () => {
+        try {
+            toast.info('Generating timesheet report...');
+            const response = await api.get('/reports/timesheets/export', { responseType: 'blob' });
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `timesheets_report_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            toast.success('Download started');
+        } catch (error) {
+            console.error('Export failed:', error);
+            toast.error('Failed to export report');
+        }
+    };
+
     return (
         <div className="space-y-8 animate-in fade-in">
             {/* Loading Indicator (Subtle) */}
@@ -298,6 +318,13 @@ const Timesheets = () => {
                                     {pendingTimesheets.length}
                                 </span>
                             )}
+                        </button>
+                        <button
+                            onClick={handleExport}
+                            className="px-4 py-2 rounded-lg text-sm font-bold text-dark-300 hover:text-white transition flex items-center border-l border-dark-700 ml-1"
+                            title="Export All CSV"
+                        >
+                            <Download size={16} className="mr-2" /> Export
                         </button>
                     </div>
                 )}
