@@ -57,20 +57,28 @@ const ProjectDetail = () => {
     // PM Edit State
     const [showPmEditModal, setShowPmEditModal] = useState(false);
     const [pmEditForm, setPmEditForm] = useState({ primaryPmId: '', assistantPmId: '' });
+    const [tasks, setTasks] = useState([]);
+
     const fetchData = async () => {
         try {
-            const res = await api.get(`/projects/${id}`);
-            setProject(res.data);
-            setMilestones(res.data.milestones || []);
+            const [projectRes, tasksRes] = await Promise.all([
+                api.get(`/projects/${id}`),
+                api.get(`/tasks?projectId=${id}`)
+            ]);
+
+            const resData = projectRes.data;
+            setProject(resData);
+            setTasks(tasksRes.data);
+            setMilestones(resData.milestones || []);
             setEditForm({
-                name: res.data.name,
-                description: res.data.description,
-                status: res.data.status,
-                priority: res.data.priority
+                name: resData.name,
+                description: resData.description,
+                status: resData.status,
+                priority: resData.priority
             });
             setPmEditForm({
-                primaryPmId: res.data.owner?._id || '',
-                assistantPmId: res.data.assistantPm?._id || ''
+                primaryPmId: resData.owner?._id || '',
+                assistantPmId: resData.assistantPm?._id || ''
             });
             setLoading(false);
         } catch (err) {
@@ -217,6 +225,17 @@ const ProjectDetail = () => {
             console.error('Download error:', err);
             toast.error('Failed to generate CSV');
         }
+    };
+
+    const getUserStats = (userId) => {
+        const userTasks = tasks.filter(t => t.assignedTo?._id === userId || t.assignedTo === userId);
+        const activeTask = userTasks.find(t => t.status === 'In Progress');
+        const completedCount = userTasks.filter(t => t.status === 'Completed').length;
+        return {
+            total: userTasks.length,
+            active: activeTask,
+            completed: completedCount
+        };
     };
 
     if (loading) return <div className="flex items-center justify-center h-64 text-dark-500 animate-pulse">Loading project details...</div>;
@@ -407,6 +426,13 @@ const ProjectDetail = () => {
                     >
                         Time Tracking
                     </button>
+                    <button
+                        onClick={() => setActiveTab('team')}
+                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
+                            ${activeTab === 'team' ? 'bg-dark-700 text-white shadow-xl' : 'text-dark-400 hover:text-white'}`}
+                    >
+                        Project Team
+                    </button>
                     {(user?.role === 'super_admin' || user?.role === 'project_manager' || user?.role === 'team_leader') && (
                         <button
                             onClick={() => setActiveTab('analytics')}
@@ -514,69 +540,137 @@ const ProjectDetail = () => {
                                         <p className="text-[10px] font-black text-dark-500 uppercase tracking-tighter">Project Managers</p>
 
                                         {/* Primary PM */}
-                                        {project?.owner && (
-                                            <div className="flex items-center justify-between p-4 bg-primary/10 border border-primary/30 rounded-2xl group hover:bg-primary/20 transition">
-                                                <div className="flex items-center">
-                                                    <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-dark-900 font-black shadow-lg shadow-primary/20">
-                                                        {project.owner.name.charAt(0)}
+                                        {project?.owner && (() => {
+                                            const stats = getUserStats(project.owner._id);
+                                            return (
+                                                <div className="flex flex-col p-4 bg-primary/10 border border-primary/30 rounded-2xl group hover:bg-primary/20 transition">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center">
+                                                            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-dark-900 font-black shadow-lg shadow-primary/20">
+                                                                {project.owner.name.charAt(0)}
+                                                            </div>
+                                                            <div className="ml-4">
+                                                                <div className="text-sm font-black text-white">{project.owner.name}</div>
+                                                                <div className="text-[10px] text-primary/70 font-black uppercase tracking-widest">PRIMARY PM</div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="text-sm font-black text-white">{stats.total}</div>
+                                                            <div className="text-[8px] text-dark-500 uppercase font-bold tracking-widest">TASKS</div>
+                                                        </div>
                                                     </div>
-                                                    <div className="ml-4">
-                                                        <div className="text-sm font-black text-white">{project.owner.name}</div>
-                                                        <div className="text-[10px] text-primary/70 font-black uppercase tracking-widest">PRIMARY</div>
-                                                    </div>
+                                                    {stats.active && (
+                                                        <div className="mt-3 pt-3 border-t border-primary/20">
+                                                            <div className="flex items-center text-[10px] text-white">
+                                                                <Clock size={10} className="mr-1.5 text-primary" />
+                                                                <span className="truncate">{stats.active.title}</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            </div>
-                                        )}
+                                            );
+                                        })()}
 
                                         {/* Assistant PM */}
-                                        {project?.assistantPm && (
-                                            <div className="flex items-center justify-between p-4 bg-purple-500/10 border border-purple-500/30 rounded-2xl group hover:bg-purple-500/20 transition">
-                                                <div className="flex items-center">
-                                                    <div className="w-10 h-10 rounded-xl bg-purple-500 flex items-center justify-center text-white font-black shadow-lg shadow-purple-500/20">
-                                                        {project.assistantPm.name.charAt(0)}
+                                        {project?.assistantPm && (() => {
+                                            const stats = getUserStats(project.assistantPm._id);
+                                            return (
+                                                <div className="flex flex-col p-4 bg-purple-500/10 border border-purple-500/30 rounded-2xl group hover:bg-purple-500/20 transition">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center">
+                                                            <div className="w-10 h-10 rounded-xl bg-purple-500 flex items-center justify-center text-white font-black shadow-lg shadow-purple-500/20">
+                                                                {project.assistantPm.name.charAt(0)}
+                                                            </div>
+                                                            <div className="ml-4">
+                                                                <div className="text-sm font-black text-white">{project.assistantPm.name}</div>
+                                                                <div className="text-[10px] text-purple-400 font-black uppercase tracking-widest">ASSISTANT PM</div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="text-sm font-black text-white">{stats.total}</div>
+                                                            <div className="text-[8px] text-dark-500 uppercase font-bold tracking-widest">TASKS</div>
+                                                        </div>
                                                     </div>
-                                                    <div className="ml-4">
-                                                        <div className="text-sm font-black text-white">{project.assistantPm.name}</div>
-                                                        <div className="text-[10px] text-purple-400 font-black uppercase tracking-widest">ASSISTANT</div>
-                                                    </div>
+                                                    {stats.active && (
+                                                        <div className="mt-3 pt-3 border-t border-purple-500/20">
+                                                            <div className="flex items-center text-[10px] text-white">
+                                                                <Clock size={10} className="mr-1.5 text-purple-400" />
+                                                                <span className="truncate">{stats.active.title}</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            </div>
-                                        )}
+                                            );
+                                        })()}
                                     </div>
                                     {/* Team Leads Section */}
                                     {project?.teamLeads && project.teamLeads.length > 0 && (
                                         <div className="space-y-3 mb-6">
                                             <p className="text-[10px] font-black text-dark-500 uppercase tracking-tighter">Team Leads</p>
-                                            {project.teamLeads.map(lead => (
-                                                <div key={lead._id} className="flex items-center justify-between p-4 bg-primary/5 border border-primary/20 rounded-2xl group hover:bg-primary/10 transition">
-                                                    <div className="flex items-center">
-                                                        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-dark-900 font-black shadow-lg shadow-primary/20">
-                                                            {lead.name.charAt(0)}
+                                            {project.teamLeads.map(lead => {
+                                                const stats = getUserStats(lead._id);
+                                                return (
+                                                    <div key={lead._id} className="flex flex-col p-4 bg-primary/5 border border-primary/20 rounded-2xl group hover:bg-primary/10 transition">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center">
+                                                                <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-dark-900 font-black shadow-lg shadow-primary/20">
+                                                                    {lead.name.charAt(0)}
+                                                                </div>
+                                                                <div className="ml-4">
+                                                                    <div className="text-sm font-black text-white">{lead.name}</div>
+                                                                    <div className="text-[10px] text-primary/70 font-black uppercase tracking-widest">Team Lead</div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <div className="text-sm font-black text-white">{stats.total}</div>
+                                                                <div className="text-[8px] text-dark-500 uppercase font-bold tracking-widest">TASKS</div>
+                                                            </div>
                                                         </div>
-                                                        <div className="ml-4">
-                                                            <div className="text-sm font-black text-white">{lead.name}</div>
-                                                            <div className="text-[10px] text-primary/70 font-black uppercase tracking-widest">Team Lead</div>
-                                                        </div>
+                                                        {stats.active && (
+                                                            <div className="mt-2 pt-2 border-t border-primary/10">
+                                                                <div className="flex items-center text-[10px] text-dark-300">
+                                                                    <Clock size={10} className="mr-1.5 text-primary" />
+                                                                    <span className="truncate">{stats.active.title}</span>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     )}
 
                                     <p className="text-[10px] font-black text-dark-500 uppercase tracking-tighter">Members</p>
-                                    {project?.members && project.members.map(member => (
-                                        <div key={member._id} className="flex items-center justify-between p-4 bg-dark-800 rounded-2xl border border-dark-600 hover:border-dark-500 transition">
-                                            <div className="flex items-center">
-                                                <div className="w-10 h-10 rounded-xl bg-dark-600 flex items-center justify-center text-white font-black shadow-lg">
-                                                    {member.name.charAt(0)}
+                                    {project?.members && project.members.map(member => {
+                                        const stats = getUserStats(member._id);
+                                        return (
+                                            <div key={member._id} className="flex flex-col p-4 bg-dark-800 rounded-2xl border border-dark-600 hover:border-dark-500 transition">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center">
+                                                        <div className="w-10 h-10 rounded-xl bg-dark-600 flex items-center justify-center text-white font-black shadow-lg">
+                                                            {member.name.charAt(0)}
+                                                        </div>
+                                                        <div className="ml-4">
+                                                            <div className="text-sm font-black text-white">{member.name}</div>
+                                                            <div className="text-[10px] text-dark-500 font-black uppercase tracking-widest">{member.role.replace('_', ' ')}</div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-sm font-black text-white">{stats.total}</div>
+                                                        <div className="text-[8px] text-dark-500 uppercase font-bold tracking-widest">TASKS</div>
+                                                    </div>
                                                 </div>
-                                                <div className="ml-4">
-                                                    <div className="text-sm font-black text-white">{member.name}</div>
-                                                    <div className="text-[10px] text-dark-500 font-black uppercase tracking-widest">{member.role.replace('_', ' ')}</div>
-                                                </div>
+                                                {stats.active && (
+                                                    <div className="mt-2 pt-2 border-t border-dark-600">
+                                                        <div className="flex items-center text-[10px] text-dark-400">
+                                                            <Clock size={10} className="mr-1.5 text-primary" />
+                                                            <span className="truncate text-dark-300">{stats.active.title}</span>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
 
                                     {canManage && (
                                         <button
@@ -641,7 +735,74 @@ const ProjectDetail = () => {
                     </div>
                 )}
 
-                {activeTab === 'analytics' && user?.role === 'super_admin' && (
+                {activeTab === 'team' && (
+                    <div className="lg:col-span-3 space-y-8 animate-in fade-in duration-500">
+                        <div className="flex items-center space-x-4 mb-4">
+                            <div className="h-12 w-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                                <Users size={24} />
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-black text-white tracking-tight">Project Force</h2>
+                                <p className="text-dark-400 text-sm font-medium">All personnel assigned to this operation.</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {/* Render everyone */}
+                            {[
+                                ...(project.owner ? [{ ...project.owner, roleTitle: 'Primary PM', theme: 'primary' }] : []),
+                                ...(project.assistantPm ? [{ ...project.assistantPm, roleTitle: 'Assistant PM', theme: 'purple' }] : []),
+                                ...(project.teamLeads || []).map(tl => ({ ...tl, roleTitle: 'Team Lead', theme: 'primary' })),
+                                ...(project.members || []).map(m => ({ ...m, roleTitle: m.role.replace('_', ' '), theme: 'dark' }))
+                            ].map((person, idx) => {
+                                const stats = getUserStats(person._id);
+                                return (
+                                    <div key={idx} className="bg-dark-700 border border-dark-600 rounded-[2rem] p-6 hover:border-primary/50 transition-all group relative overflow-hidden">
+                                        <div className="flex items-start justify-between mb-6">
+                                            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black shadow-xl
+                                                ${person.roleTitle === 'Primary PM' ? 'bg-primary text-dark-900 shadow-primary/20' :
+                                                    person.roleTitle === 'Assistant PM' ? 'bg-purple-500 text-white shadow-purple-500/20' :
+                                                        'bg-dark-600 text-white'}`}>
+                                                {person.name.charAt(0)}
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-2xl font-black text-white">{stats.total}</div>
+                                                <div className="text-[8px] text-dark-500 uppercase font-black tracking-widest">Total Tasks</div>
+                                            </div>
+                                        </div>
+
+                                        <h4 className="text-lg font-black text-white group-hover:text-primary transition-colors">{person.name}</h4>
+                                        <p className="text-[10px] text-dark-500 font-black uppercase tracking-widest mb-6">{person.roleTitle}</p>
+
+                                        <div className="space-y-4 pt-4 border-t border-dark-600">
+                                            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                                                <span className="text-dark-500">Completed</span>
+                                                <span className="text-success">{stats.completed} Tasks</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                                                <span className="text-dark-500">Status</span>
+                                                <span className={stats.active ? 'text-primary' : 'text-dark-600'}>
+                                                    {stats.active ? 'Working Now' : 'Standby'}
+                                                </span>
+                                            </div>
+                                            {stats.active && (
+                                                <div className="bg-dark-800 rounded-xl p-3 border border-dark-600 group-hover:border-primary/30 transition-colors">
+                                                    <p className="text-[8px] text-dark-500 uppercase font-black tracking-widest mb-1">Current Focus</p>
+                                                    <p className="text-[10px] text-white font-bold truncate">{stats.active.title}</p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Decorative Element */}
+                                        <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12 blur-2xl pointer-events-none"></div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'analytics' && ['super_admin', 'project_manager', 'team_leader'].includes(user?.role) && (
                     <div className="lg:col-span-3 space-y-12 animate-in fade-in slide-in-from-bottom-10 duration-500">
                         <ProjectAnalyticsCharts projectId={project._id} />
                         <EmployeeActivityView projectId={project._id} />

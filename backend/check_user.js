@@ -8,7 +8,8 @@ const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/project_mgmt_app
 
 async function checkUser() {
     try {
-        await mongoose.connect(uri);
+        console.log(`Checking DB: ${uri.includes('localhost') ? 'Local' : 'Remote'}`);
+        await mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true });
         console.log('Connected to DB');
 
         const user = await User.findOne({ loginId: 'superadmin01' });

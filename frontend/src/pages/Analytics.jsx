@@ -28,7 +28,7 @@ const Analytics = () => {
     const { user } = useContext(AuthContext);
     const [stats, setStats] = useState(null);
     const [loginLogs, setLoginLogs] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (user) {

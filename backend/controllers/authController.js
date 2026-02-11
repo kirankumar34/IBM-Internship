@@ -5,7 +5,7 @@ const User = require('../models/userModel');
 const LoginActivity = require('../models/loginActivityModel');
 
 const generateToken = (id) => {
-    return jwt.sign({ id }, process.env.JWT_SECRET || 'fallback_secret_do_not_use_in_prod', {
+    return jwt.sign({ id }, process.env.JWT_SECRET, {
         expiresIn: '30d',
     });
 };
@@ -263,7 +263,8 @@ const resetPassword = asyncHandler(async (req, res) => {
 // @route   GET /api/auth/me
 // @access  Private
 const getMe = asyncHandler(async (req, res) => {
-    res.json(req.user);
+    const user = await User.findById(req.user.id).populate('reportsTo', 'name email role').select('-password');
+    res.json(user);
 });
 
 // @desc    Logout user and track activity

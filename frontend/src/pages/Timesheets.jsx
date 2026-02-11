@@ -10,7 +10,7 @@ const Timesheets = () => {
     const [timesheet, setTimesheet] = useState(null);
     const [assignedTasks, setAssignedTasks] = useState([]);
     const [pendingTimesheets, setPendingTimesheets] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [activeTab, setActiveTab] = useState('my');
     const [processingId, setProcessingId] = useState(null);

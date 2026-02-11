@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../context/api';
 import { toast } from 'react-toastify';
 import { KeyRound, ArrowLeft } from 'lucide-react';
 
@@ -11,8 +11,7 @@ const ForgotPassword = () => {
     const onSubmit = async (e) => {
         e.preventDefault();
         try {
-            // Direct axios call or use api instance
-            const res = await axios.post('http://localhost:5000/api/auth/forgotpassword', { loginId });
+            const res = await api.post('/auth/forgotpassword', { loginId });
 
             // For demo: show the token in toast so they can "click" it (copy paste)
             if (res.data.success) {

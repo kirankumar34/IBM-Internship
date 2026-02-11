@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Clock, Save, X } from 'lucide-react';
-import axios from 'axios';
+import api from '../../context/api';
 import { toast } from 'react-toastify';
 
 const TimeLogForm = ({ taskId, tasks, onSuccess, onCancel }) => {
@@ -39,16 +39,13 @@ const TimeLogForm = ({ taskId, tasks, onSuccess, onCancel }) => {
 
         setLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            await axios.post('/api/timelogs', {
+            await api.post('/timelogs', {
                 taskId: formData.taskId,
                 date: formData.date,
                 startTime: start.toISOString(),
                 endTime: end.toISOString(),
                 description: formData.description,
                 isManual: true
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
 
             toast.success('Time log added successfully');

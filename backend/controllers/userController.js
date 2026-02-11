@@ -1,5 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/userModel');
+const Task = require('../models/taskModel');
+
 
 // @desc    Get all users (hierarchical view)
 // @route   GET /api/users
@@ -13,7 +15,14 @@ const getUsers = asyncHandler(async (req, res) => {
     if (role === 'project_manager') {
         query = { role: { $in: ['team_leader', 'team_member'] } };
     } else if (role === 'team_leader') {
-        query = { role: { $in: ['team_member'] } };
+        const currentUser = await User.findById(id);
+        const reportToId = currentUser.reportsTo;
+        query = {
+            $or: [
+                { reportsTo: id },
+                { _id: reportToId }
+            ]
+        };
     } else if (role === 'client') {
         query = { role: 'client' }; // Clients see other clients? Or nothing. Let's say nothing for now.
     } else if (role === 'team_member') {
@@ -25,7 +34,49 @@ const getUsers = asyncHandler(async (req, res) => {
         .select('-password')
         .sort({ role: 1, name: 1 });
 
-    res.json(users);
+    // Performance Optimization: Fetch all task stats in parallel for these users
+    const userIds = users.map(u => u._id);
+
+
+    // Aggregation for efficiency
+    const taskStats = await Task.aggregate([
+        { $match: { assignedTo: { $in: userIds } } },
+        {
+            $group: {
+                _id: '$assignedTo',
+                total: { $sum: 1 },
+                completed: { $sum: { $cond: [{ $eq: ['$status', 'Completed'] }, 1, 0] } },
+                inProgress: { $sum: { $cond: [{ $eq: ['$status', 'In Progress'] }, 1, 0] } },
+                blocked: { $sum: { $cond: [{ $eq: ['$status', 'Blocked'] }, 1, 0] } },
+                toDo: { $sum: { $cond: [{ $eq: ['$status', 'To Do'] }, 1, 0] } }
+            }
+        }
+    ]);
+
+    const statsMap = {};
+    taskStats.forEach(stat => {
+        statsMap[stat._id.toString()] = {
+            total: stat.total,
+            completed: stat.completed,
+            inProgress: stat.inProgress,
+            blocked: stat.blocked,
+            toDo: stat.toDo
+        };
+    });
+
+    const usersWithStats = users.map(u => {
+        const userObj = u.toObject();
+        userObj.taskStats = statsMap[u._id.toString()] || {
+            total: 0,
+            completed: 0,
+            inProgress: 0,
+            blocked: 0,
+            toDo: 0
+        };
+        return userObj;
+    });
+
+    res.json(usersWithStats);
 });
 
 // @desc    Create new user member (Hierarchy restricted)

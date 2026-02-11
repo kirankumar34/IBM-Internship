@@ -12,97 +12,102 @@ const { calculateProjectProgress } = require('../utils/analyticsHelper');
 // @desc    Get global analytics (filtered by role)
 // @route   GET /api/analytics/global
 const getGlobalStats = asyncHandler(async (req, res) => {
-    const { role, id: userId } = req.user;
+    try {
+        const { role, id: userId } = req.user;
 
-    let projectQuery = {};
-    if (role !== 'super_admin') {
-        projectQuery = {
-            $or: [{ owner: userId }, { members: userId }, { teamLeads: userId }]
-        };
-    }
+        let projectQuery = {};
+        if (role !== 'super_admin') {
+            projectQuery = {
+                $or: [{ owner: userId }, { members: userId }, { teamLeads: userId }]
+            };
+        }
 
-    const projects = await Project.find(projectQuery);
-    const projectIds = projects.map(p => p._id);
+        const projects = await Project.find(projectQuery);
+        const projectIds = projects.map(p => p._id);
 
-    const totalProjects = projects.length;
+        const totalProjects = projects.length;
 
-    // Calculate global metrics based only on projects the user can see
-    const tasks = await Task.find({ project: { $in: projectIds } });
-    const totalTasks = tasks.length;
-    const completedTasks = tasks.filter(t => t.status === 'Completed').length;
+        // Calculate global metrics based only on projects the user can see
+        const tasks = await Task.find({ project: { $in: projectIds } });
+        const totalTasks = tasks.length;
+        const completedTasks = tasks.filter(t => t.status === 'Completed').length;
 
-    // EXACT formula requested for global completion: (Completed Tasks / Total Tasks) * 100
-    const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+        // EXACT formula requested for global completion: (Completed Tasks / Total Tasks) * 100
+        const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-    const milestones = await Milestone.find({ project: { $in: projectIds } });
+        const milestones = await Milestone.find({ project: { $in: projectIds } });
 
-    // Global effort (hours) - Approved only
-    const eightWeeksAgo = new Date();
-    eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56);
+        // Global effort (hours) - Approved only
+        const eightWeeksAgo = new Date();
+        eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56);
 
-    const timeLogs = await TimeLog.find({
-        project: { $in: projectIds },
-        isApproved: true
-    });
-
-    // Total Hours
-    const totalHours = Math.round(timeLogs.reduce((sum, log) => sum + log.duration, 0) * 10) / 10;
-
-    // Weekly Trend (last 8 weeks)
-    const recentLogs = timeLogs.filter(log => new Date(log.date) >= eightWeeksAgo);
-    const weeklyEffortMap = {};
-
-    recentLogs.forEach(log => {
-        const weekStart = new Date(log.date);
-        weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); // Monday
-        const weekKey = weekStart.toISOString().split('T')[0];
-        weeklyEffortMap[weekKey] = (weeklyEffortMap[weekKey] || 0) + log.duration;
-    });
-
-    const globalWeeklyEffort = Object.keys(weeklyEffortMap)
-        .sort()
-        .map(week => ({
-            name: new Date(week).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-            value: Math.round(weeklyEffortMap[week] * 10) / 10
-        }));
-
-    // Per-project effort breakdown (only for admin)
-    let projectEffort = [];
-    if (role === 'super_admin') {
-        const allLogs = await TimeLog.find({});
-        const effortMap = {};
-        allLogs.forEach(l => {
-            effortMap[l.project] = (effortMap[l.project] || 0) + l.duration;
+        const timeLogs = await TimeLog.find({
+            project: { $in: projectIds },
+            isApproved: true
         });
 
-        projectEffort = projects.map(p => ({
-            name: p.name,
-            hours: Math.round((effortMap[p._id] || 0) * 10) / 10
-        })).sort((a, b) => b.hours - a.hours).slice(0, 5);
-    }
+        // Total Hours
+        const totalHours = Math.round(timeLogs.reduce((sum, log) => sum + log.duration, 0) * 10) / 10;
 
-    const pendingHours = await IndividualTimesheet.find({ status: 'submitted' }).then(tss => tss.reduce((s, t) => s + t.totalHours, 0));
+        // Weekly Trend (last 8 weeks)
+        const recentLogs = timeLogs.filter(log => new Date(log.date) >= eightWeeksAgo);
+        const weeklyEffortMap = {};
 
-    res.json({
-        totalProjects,
-        totalUsers: await User.countDocuments(role === 'super_admin' ? {} : { organizationId: req.user.organizationId }),
-        totalTasks,
-        totalHours,
-        pendingHours, // Added for admin overview
-        projectEffort, // Added for admin overview
-        taskCompletionRate, // Used by dashboard
-        avgCompletionRate: taskCompletionRate, // Legacy alias
-        globalWeeklyEffort, // Added for dashboard chart
-        projectStatus: {
-            active: projects.filter(p => p.status === 'Active').length,
-            completed: projects.filter(p => p.status === 'Completed').length,
-            onHold: projects.filter(p => p.status === 'On Hold').length
-        },
-        milestoneStats: {
-            total: milestones.length,
-            completed: milestones.filter(m => m.status === 'Completed').length
+        recentLogs.forEach(log => {
+            const weekStart = new Date(log.date);
+            weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); // Monday
+            const weekKey = weekStart.toISOString().split('T')[0];
+            weeklyEffortMap[weekKey] = (weeklyEffortMap[weekKey] || 0) + log.duration;
+        });
+
+        const globalWeeklyEffort = Object.keys(weeklyEffortMap)
+            .sort()
+            .map(week => ({
+                name: new Date(week).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                value: Math.round(weeklyEffortMap[week] * 10) / 10
+            }));
+
+        // Per-project effort breakdown (only for admin)
+        let projectEffort = [];
+        if (role === 'super_admin') {
+            const allLogs = await TimeLog.find({});
+            const effortMap = {};
+            allLogs.forEach(l => {
+                effortMap[l.project] = (effortMap[l.project] || 0) + l.duration;
+            });
+
+            projectEffort = projects.map(p => ({
+                name: p.name,
+                hours: Math.round((effortMap[p._id] || 0) * 10) / 10
+            })).sort((a, b) => b.hours - a.hours).slice(0, 5);
         }
-    });
+
+        const pendingHours = await IndividualTimesheet.find({ status: 'submitted' }).then(tss => tss.reduce((s, t) => s + t.totalHours, 0));
+
+        res.json({
+            totalProjects,
+            totalUsers: await User.countDocuments(role === 'super_admin' ? {} : { organizationId: req.user.organizationId }),
+            totalTasks,
+            totalHours,
+            pendingHours, // Added for admin overview
+            projectEffort, // Added for admin overview
+            taskCompletionRate, // Used by dashboard
+            avgCompletionRate: taskCompletionRate, // Legacy alias
+            globalWeeklyEffort, // Added for dashboard chart
+            projectStatus: {
+                active: projects.filter(p => p.status === 'Active').length,
+                completed: projects.filter(p => p.status === 'Completed').length,
+                onHold: projects.filter(p => p.status === 'On Hold').length
+            },
+            milestoneStats: {
+                total: milestones.length,
+                completed: milestones.filter(m => m.status === 'Completed').length
+            }
+        });
+    } catch (error) {
+        console.error('Analytics Error:', error);
+        res.status(500).json({ message: error.message });
+    }
 });
 
 // @desc    Get project progress data

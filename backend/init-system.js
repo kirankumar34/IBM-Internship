@@ -12,7 +12,9 @@ dotenv.config();
 
 const mongooseConnect = async () => {
     try {
-        const conn = await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/project_mgmt_app');
+        const DB_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/project_mgmt_app';
+        console.log(`Connecting to: ${DB_URI.includes('127.0.0.1') ? 'Localhost' : 'Remote DB'}`.yellow);
+        const conn = await mongoose.connect(DB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
         console.log(`MongoDB Connected: ${conn.connection.host}`.cyan.underline);
     } catch (error) {
         console.error(`Error: ${error.message}`.red.underline.bold);

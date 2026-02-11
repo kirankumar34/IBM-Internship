@@ -218,19 +218,43 @@ const Projects = () => {
 
                             {/* Footer */}
                             <div className="flex items-center justify-between pt-6 border-t border-dark-600/50">
-                                <div className="flex -space-x-3">
-                                    {project.members && project.members.map((m, i) => (
-                                        <div key={i} title={m.name} className="w-9 h-9 rounded-full bg-dark-600 border-4 border-dark-700 flex items-center justify-center text-[10px] text-white font-black shadow-lg">
+                                <div className="flex -space-x-3 group/members">
+                                    {/* Primary PM */}
+                                    {project.owner && (
+                                        <div title={`PM: ${project.owner.name}`} className="w-9 h-9 rounded-full bg-primary border-4 border-dark-700 flex items-center justify-center text-[10px] text-dark-900 font-black shadow-lg relative z-30 ring-2 ring-primary/20">
+                                            {project.owner.name.charAt(0)}
+                                        </div>
+                                    )}
+                                    {/* Assistant PM */}
+                                    {project.assistantPm && (
+                                        <div title={`APM: ${project.assistantPm.name}`} className="w-9 h-9 rounded-full bg-purple-500 border-4 border-dark-700 flex items-center justify-center text-[10px] text-white font-black shadow-lg relative z-20 ring-2 ring-purple-500/20">
+                                            {project.assistantPm.name.charAt(0)}
+                                        </div>
+                                    )}
+                                    {/* Members Limit 3 */}
+                                    {(project.members || []).slice(0, 3).map((m, i) => (
+                                        <div key={i} title={m.name} className="w-9 h-9 rounded-full bg-dark-600 border-4 border-dark-700 flex items-center justify-center text-[10px] text-white font-black shadow-lg relative z-10 transition-transform group-hover/members:translate-x-1">
                                             {m.name.charAt(0)}
                                         </div>
                                     ))}
-                                    {(!project.members || project.members.length === 0) && (
+                                    {/* Remaining Count */}
+                                    {(project.members && project.members.length > 3) && (
+                                        <div className="w-9 h-9 rounded-full bg-dark-800 border-4 border-dark-700 flex items-center justify-center text-[10px] text-dark-400 font-black shadow-lg relative z-0">
+                                            +{project.members.length - 3}
+                                        </div>
+                                    )}
+                                    {(!project.owner && (!project.members || project.members.length === 0)) && (
                                         <div className="w-9 h-9 rounded-full bg-dark-600 border-4 border-dark-700 flex items-center justify-center text-[10px] text-dark-400 font-bold">?</div>
                                     )}
                                 </div>
-                                <div className="flex items-center text-[10px] text-dark-500 font-black uppercase tracking-widest">
-                                    <Calendar size={14} className="mr-1.5 text-primary" />
-                                    {project.endDate ? new Date(project.endDate).toLocaleDateString() : 'No date'}
+                                <div className="flex flex-col items-end">
+                                    <div className="flex items-center text-[10px] text-dark-400 font-black uppercase tracking-widest mb-1">
+                                        <Calendar size={12} className="mr-1.5 text-primary" />
+                                        {project.endDate ? new Date(project.endDate).toLocaleDateString() : 'No date'}
+                                    </div>
+                                    <div className="text-[8px] text-dark-600 font-bold uppercase tracking-widest">
+                                        {(project.members?.length || 0) + (project.owner ? 1 : 0) + (project.assistantPm ? 1 : 0)} Enrolled
+                                    </div>
                                 </div>
                             </div>
                         </div>

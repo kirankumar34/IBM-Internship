@@ -45,6 +45,7 @@ const Team = () => {
     const fetchUsers = async () => {
         try {
             const res = await api.get('/users');
+            // Backend now provides taskStats, so we use it directly
             setUsers(res.data);
             setLoading(false);
         } catch (err) {
@@ -178,27 +179,65 @@ const Team = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {activeUsers.map((user) => (
                     <div key={user._id} className="bg-dark-700/50 rounded-3xl border border-dark-600 p-6 flex flex-col group hover:border-primary/50 transition-all duration-300 backdrop-blur-sm relative overflow-hidden">
-                        {/* Manager Badge */}
-                        {user.reportsTo && (
-                            <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <div className="text-[10px] bg-dark-800 text-dark-400 px-2 py-1 rounded-lg border border-dark-600 flex items-center">
-                                    <Shield size={10} className="mr-1" /> Managed by {user.reportsTo.name.split(' ')[0]}
-                                </div>
-                            </div>
-                        )}
+
 
                         <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-dark-600 to-dark-800 flex items-center justify-center text-xl font-black text-primary mb-4 border border-dark-600 group-hover:scale-110 transition-transform">
                             {user.name.charAt(0)}
                         </div>
 
-                        <div className="mb-6">
+                        <div className="mb-4">
                             <h3 className="text-lg font-bold text-white group-hover:text-primary transition-colors">{user.name}</h3>
-                            <div className="flex items-center mt-1">
+                            <div className="flex items-center gap-2 mt-2">
                                 <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${getRoleBadgeColor(user.role)}`}>
                                     {user.role.replace('_', ' ')}
                                 </span>
                             </div>
+
+                            {/* Reports To - Always Visible */}
+                            {user.reportsTo && (
+                                <div className="mt-2 text-[11px] bg-dark-800/50 text-dark-300 px-2 py-1 rounded-lg border border-dark-600 flex items-center w-fit">
+                                    <Shield size={10} className="mr-1 text-primary" /> Reports to: <span className="font-bold text-white ml-1">{user.reportsTo.name}</span>
+                                </div>
+                            )}
+                            {!user.reportsTo && user.role !== 'super_admin' && (
+                                <div className="mt-2 text-[11px] bg-orange-500/10 text-orange-400 px-2 py-1 rounded-lg border border-orange-500/20 flex items-center w-fit">
+                                    <Shield size={10} className="mr-1" /> Not assigned to manager
+                                </div>
+                            )}
                         </div>
+
+                        {/* Task Status Summary */}
+                        {user.taskStats && (
+                            <div className="mb-4 p-3 bg-dark-800/50 rounded-xl border border-dark-600">
+                                <div className="text-[10px] font-black text-dark-400 uppercase tracking-widest mb-2">Assigned Tasks</div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-2xl font-black text-white">{user.taskStats.total || 0}</span>
+                                    <div className="flex gap-1">
+                                        {user.taskStats.completed > 0 && (
+                                            <span className="text-[9px] bg-success/20 text-success px-1.5 py-0.5 rounded font-bold">
+                                                ✓ {user.taskStats.completed}
+                                            </span>
+                                        )}
+                                        {user.taskStats.inProgress > 0 && (
+                                            <span className="text-[9px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-bold">
+                                                ⟳ {user.taskStats.inProgress}
+                                            </span>
+                                        )}
+                                        {user.taskStats.blocked > 0 && (
+                                            <span className="text-[9px] bg-danger/20 text-danger px-1.5 py-0.5 rounded font-bold">
+                                                ⊘ {user.taskStats.blocked}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="w-full bg-dark-900 rounded-full h-1.5 overflow-hidden">
+                                    <div
+                                        className="bg-success h-full transition-all"
+                                        style={{ width: `${user.taskStats.total > 0 ? (user.taskStats.completed / user.taskStats.total) * 100 : 0}%` }}
+                                    ></div>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="space-y-3 mt-auto">
                             <div className="flex items-center text-xs text-dark-400">

@@ -71,28 +71,14 @@ const TaskBoard = ({ projectId, members }) => {
         }
 
         if (currentRole === 'team_leader') {
-            // TL sees Members of THEIR Team
-            const myTeamId = user.teamId?._id || user.teamId;
+            // TL can assign to ANY team member in the project
+            // Backend enforces that the user must be a project member
+            const teamMembers = members.filter(m => m.role === 'team_member');
 
-            // Try matching by ID first
-            let myMembers = [];
-            if (myTeamId) {
-                myMembers = members.filter(m => {
-                    const mTeamId = m.teamId?._id || m.teamId;
-                    return m.role === 'team_member' && mTeamId === myTeamId;
-                });
+            if (teamMembers.length > 0) {
+                return [{ label: 'Team Members', options: teamMembers }];
             }
-
-            // Fallback: If no teamID found for me, or no members found with that team ID
-            // Maybe I am "Unassigned" but members report to me?
-            if (myMembers.length === 0) {
-                myMembers = members.filter(m => m.reportsTo === currentId || m.reportsTo?._id === currentId);
-            }
-
-            if (myMembers.length > 0) {
-                return [{ label: user.teamId?.name || 'My Team', options: myMembers }];
-            }
-            // Strict Mode: return empty if no members found.
+            // If no team members, return empty
             return [];
         }
 
@@ -111,9 +97,10 @@ const TaskBoard = ({ projectId, members }) => {
         try {
             const res = await api.get(`/tasks?projectId=${projectId}`);
             setTasks(res.data);
-            setLoading(false);
         } catch (err) {
             toast.error('Failed to load tasks');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -308,6 +295,37 @@ const TaskBoard = ({ projectId, members }) => {
                                     {selectedTask.description || 'No description provided.'}
                                 </p>
                             </section>
+
+                            {/* Status Update Section */}
+                            {(selectedTask.assignedTo?._id === user._id ||
+                                ['super_admin', 'project_manager', 'team_leader'].includes(user.role)) && (
+                                    <section>
+                                        <h3 className="text-xs font-bold text-dark-400 uppercase tracking-widest mb-2">Update Status</h3>
+                                        <select
+                                            value={selectedTask.status}
+                                            onChange={(e) => {
+                                                const newStatus = e.target.value;
+                                                if (newStatus === 'Blocked') {
+                                                    const reason = prompt('Please enter a reason for blocking this task:');
+                                                    if (reason) {
+                                                        updateStatus(selectedTask._id, newStatus, reason);
+                                                    }
+                                                } else {
+                                                    updateStatus(selectedTask._id, newStatus);
+                                                }
+                                            }}
+                                            className="w-full bg-dark-800 border border-dark-600 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-primary transition"
+                                        >
+                                            <option value="To Do">To Do</option>
+                                            <option value="In Progress">In Progress</option>
+                                            <option value="Blocked">Blocked</option>
+                                            <option value="Completed">Completed</option>
+                                        </select>
+                                        <p className="text-xs text-dark-500 mt-2 italic">
+                                            💡 You can also drag tasks between columns to update status
+                                        </p>
+                                    </section>
+                                )}
 
                             <div className="grid grid-cols-2 gap-6">
                                 <section>

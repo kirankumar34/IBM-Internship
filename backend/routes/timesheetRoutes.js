@@ -45,81 +45,87 @@ function getWeekEnd(weekStart) {
 // @route   GET /api/timesheets/user/:userId/week/:weekId
 // @access  Private (self or manager)
 const getWeeklyTimesheet = asyncHandler(async (req, res) => {
-    const { userId, weekId } = req.params;
+    try {
+        const { userId, weekId } = req.params;
 
-    // Authorization check
-    // Users can see their own. 
-    // Managers can see if they supervise the user.
-    // Super Admin sees all.
-    let isAuthorized = req.user.id === userId || req.user.role === 'super_admin';
+        // Authorization check
+        // Users can see their own. 
+        // Managers can see if they supervise the user.
+        // Super Admin sees all.
+        let isAuthorized = req.user.id === userId || req.user.role === 'super_admin';
 
-    if (!isAuthorized && ['project_manager', 'team_leader'].includes(req.user.role)) {
-        // Strict Check: PM/TL must be leading a project where the user is a member
-        const commonProjects = await Project.countDocuments({
-            $or: [{ owner: req.user.id }, { teamLeads: req.user.id }],
-            members: userId
-        });
-        isAuthorized = commonProjects > 0;
-    }
-
-    if (!isAuthorized) {
-        res.status(403);
-        throw new Error('Not authorized to view this timesheet');
-    }
-
-    const { weekStart, weekEnd } = getWeekDates(weekId);
-
-    // Get all time logs for this week
-    const timeLogs = await TimeLog.find({
-        user: userId,
-        date: { $gte: weekStart, $lte: weekEnd }
-    });
-
-    // Find or create timesheet
-    let timesheet = await Timesheet.findOne({
-        user: userId,
-        weekStartDate: weekStart
-    });
-
-    // Determine Status
-    // If no timesheet exists, status is draft.
-    // If exists, keep status.
-
-    if (!timesheet) {
-        // Create new timesheet with time logs from that week
-        timesheet = await Timesheet.create({
-            user: userId,
-            weekStartDate: weekStart,
-            weekEndDate: weekEnd,
-            entries: timeLogs.map(log => log._id),
-            status: 'draft',
-            totalHours: timeLogs.reduce((acc, log) => acc + log.duration, 0)
-        });
-    } else {
-        // Ensure entries are synced (in case logs were added separately)
-        // Check if logs count mismatches
-        const currentEntryIds = timesheet.entries.map(id => id.toString());
-        const logsIds = timeLogs.map(log => log._id.toString());
-
-        const needsSync = logsIds.some(id => !currentEntryIds.includes(id)) || logsIds.length !== currentEntryIds.length;
-
-        if (needsSync) {
-            timesheet.entries = logsIds;
-            timesheet.totalHours = timeLogs.reduce((acc, log) => acc + log.duration, 0);
-            await timesheet.save();
+        if (!isAuthorized && ['project_manager', 'team_leader'].includes(req.user.role)) {
+            // Strict Check: PM/TL must be leading a project where the user is a member
+            const commonProjects = await Project.countDocuments({
+                $or: [{ owner: req.user.id }, { teamLeads: req.user.id }],
+                members: userId
+            });
+            isAuthorized = commonProjects > 0;
         }
+
+        if (!isAuthorized) {
+            res.status(403);
+            throw new Error('Not authorized to view this timesheet');
+        }
+
+        const { weekStart, weekEnd } = getWeekDates(weekId);
+
+        // Get all time logs for this week
+        const timeLogs = await TimeLog.find({
+            user: userId,
+            date: { $gte: weekStart, $lte: weekEnd }
+        });
+
+        // Find or create timesheet
+        let timesheet = await Timesheet.findOne({
+            user: userId,
+            weekStartDate: weekStart
+        });
+
+        // Determine Status
+        // If no timesheet exists, status is draft.
+        // If exists, keep status.
+
+        if (!timesheet) {
+            // Create new timesheet with time logs from that week
+            timesheet = await Timesheet.create({
+                user: userId,
+                weekStartDate: weekStart,
+                weekEndDate: weekEnd,
+                entries: timeLogs.map(log => log._id),
+                status: 'draft',
+                totalHours: timeLogs.reduce((acc, log) => acc + log.duration, 0)
+            });
+        } else {
+            // Ensure entries are synced (in case logs were added separately)
+            // Check if logs count mismatches
+            const currentEntryIds = timesheet.entries.map(id => id.toString());
+            const logsIds = timeLogs.map(log => log._id.toString());
+
+            const needsSync = logsIds.some(id => !currentEntryIds.includes(id)) || logsIds.length !== currentEntryIds.length;
+
+            if (needsSync) {
+                timesheet.entries = logsIds;
+                timesheet.totalHours = timeLogs.reduce((acc, log) => acc + log.duration, 0);
+                await timesheet.save();
+            }
+        }
+
+        await timesheet.populate({
+            path: 'entries',
+            populate: { path: 'task', select: 'title project' } // Fetch task title AND project
+        });
+        // Deep populate project for task to show Project Name in UI if needed
+        // But basic populate above should be enough if task has project ref
+
+        await timesheet.populate('approver', 'name');
+
+        res.json(timesheet);
+    } catch (error) {
+        console.error('getWeeklyTimesheet Error:', error);
+        const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+        res.status(statusCode).json({ message: error.message });
     }
-
-    await timesheet.populate({
-        path: 'entries',
-        populate: { path: 'task', select: 'title project' } // Fetch task title AND project
-    });
-    // Deep populate project for task to show Project Name in UI if needed
-    // But basic populate above should be enough if task has project ref
-
-    await timesheet.populate('approver', 'name');
-
-    res.json(timesheet);
 });
 
 // @desc    Save/Update timesheet entries

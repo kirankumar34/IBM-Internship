@@ -29,9 +29,55 @@ const hasCircularDependency = async (taskId, dependencies) => {
 // @route   GET /api/tasks
 // @access  Private
 const getTasks = asyncHandler(async (req, res) => {
+    const { role, id } = req.user;
     let query = {};
+
     if (req.query.projectId) {
         query.project = req.query.projectId;
+    }
+
+    if (req.query.assignedTo) {
+        query.assignedTo = req.query.assignedTo;
+    }
+
+    // Role-based scoping: Ensure users only see tasks relevant to them
+    if (role === 'team_leader') {
+        const User = require('../models/userModel');
+        const teamMembers = await User.find({ reportsTo: id }).select('_id');
+        const teamMemberIds = teamMembers.map(m => m._id);
+
+        query = {
+            ...query,
+            $or: [
+                { assignedTo: id },
+                { assignedTo: { $in: teamMemberIds } },
+                { createdBy: id }
+            ]
+        };
+    } else if (role === 'team_member') {
+        query = {
+            ...query,
+            $or: [
+                { assignedTo: id },
+                { createdBy: id }
+            ]
+        };
+    } else if (role === 'project_manager') {
+        // PM sees tasks in projects they own or are members of
+        const Project = require('../models/projectModel');
+        const myProjects = await Project.find({
+            $or: [{ owner: id }, { members: id }, { teamLeads: id }]
+        }).select('_id');
+        const myProjectIds = myProjects.map(p => p._id);
+
+        query = {
+            ...query,
+            $or: [
+                { project: { $in: myProjectIds } },
+                { createdBy: id },
+                { assignedTo: id }
+            ]
+        };
     }
 
     const tasks = await Task.find(query)

@@ -262,7 +262,12 @@ const getWeekEnd = (weekStart) => {
 
 const seedDatabase = async () => {
     try {
-        await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/project_mgmt_app');
+        const DB_URI = process.env.MONGO_URI;
+        if (!DB_URI) {
+            console.error('MONGO_URI is not defined in .env file');
+            process.exit(1);
+        }
+        await mongoose.connect(DB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
         console.log('MongoDB Connected');
 
         // Clear existing data
