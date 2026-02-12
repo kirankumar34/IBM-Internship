@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || '/api',
+    baseURL: "https://internship-9hwf.onrender.com/api",
 });
 
 // Request interceptor to add token
