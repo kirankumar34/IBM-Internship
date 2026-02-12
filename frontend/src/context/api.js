@@ -1,8 +1,9 @@
 import axios from 'axios';
 
-const api = axios.create({
-    baseURL: "https://internship-9hwf.onrender.com",
+const API = axios.create({
+    baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api"
 });
+
 
 // Request interceptor to add token
 api.interceptors.request.use(
